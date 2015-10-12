@@ -126,7 +126,6 @@ int main(int argc, char** argv) {
     // cleanup
     closesocket(Socket);
     WSACleanup();
-    cout << "lol" << endl;
     return 0;
 }
 
