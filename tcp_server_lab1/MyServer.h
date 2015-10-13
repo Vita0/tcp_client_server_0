@@ -9,9 +9,10 @@
 #define	MYSERVER_H
 
 #include <Winsock2.h>
-#include <vector>
+#include <queue>
 #include <map>
 #include "thread"
+#include <mutex>
 #include <memory>
 
 #include <cstdlib>
@@ -28,13 +29,16 @@ class MyServer
     vector<SOCKET> m_acs;
     bool m_stop;
     shared_ptr<thread> acc;
-    shared_ptr<thread> run;
+    shared_ptr<thread> comands;
     map<SOCKET,shared_ptr<thread>> ths;
+    queue<SOCKET> ths_for_del;
+    mutex ths_mutex;
 public:
     MyServer(const char *ip, u_short port);
     ~MyServer();
     void my_accept();
     void exchange(SOCKET sock);
+    void getCommands();
     void start();
 };
 

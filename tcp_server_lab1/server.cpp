@@ -6,8 +6,12 @@
  */
 
 
+//TODO 
+//косячно завершение с клиентом по kill-у
+
 #include <windows.h>
 #include "MyServer.h"
+#include <exception>
 
 //#pragma comment(lib,"Ws2_32.lib")
 #pragma comment(lib,"wsock32.lib")
@@ -20,7 +24,7 @@ int main(int argc, char** argv) {
         MyServer server("127.0.0.1",27015);
         server.start();
     }
-    catch(...){}
+    catch(std::exception &e){ cout << "exeption: " << e.what() << endl; }
     return 0;
 }
 

@@ -84,6 +84,7 @@ int main(int argc, char** argv) {
         char sendbuf[DEFAULT_BUFLEN+1];
         std::fill(sendbuf, sendbuf + DEFAULT_BUFLEN, '\0');
         cin.getline(sendbuf,DEFAULT_BUFLEN);
+        //if ( Socket == )
         iResult = send( Socket, sendbuf, DEFAULT_BUFLEN, 0);
         if (iResult == SOCKET_ERROR) {
             printf("send failed: %d\n", WSAGetLastError());
