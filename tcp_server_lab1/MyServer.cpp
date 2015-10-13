@@ -120,64 +120,55 @@ void MyServer::my_accept()
             wprintf(L"%d\n", cl_service.sin_port);
             wprintf(L"  Server create new socket for client, that IP:PORT - %s:", inet_ntoa((in_addr) ac_service.sin_addr));
             wprintf(L"%d\n", ac_service.sin_port);
-            m_acs.push_back(ac_sock);
+            //m_acs.push_back(ac_sock);
+            ths.insert(make_pair(ac_sock, shared_ptr<thread>(new thread(&MyServer::exchange,this, ac_sock))));
+            ths.at(ac_sock)->detach();
         }
     }
 }
 
-void MyServer::exchange()
+void MyServer::exchange(SOCKET sock)
 {
     int recvbuflen = DEFAULT_BUFLEN;
     char recvbuf[DEFAULT_BUFLEN+1] = "";
     
     while (!m_stop)
     {
-        int end = m_acs.size();
-        bool secret = false;
-        int i;
-        for(i=0; i < end; ++i)
-        {
-            std::fill(recvbuf, recvbuf + DEFAULT_BUFLEN, '\0');
+        std::fill(recvbuf, recvbuf + DEFAULT_BUFLEN, '\0');
 
-            int iResult = readn(m_acs[i], recvbuf, recvbuflen);
-            if ( iResult > 0 ) {
-                printf("%s\n",recvbuf);
-                wprintf(L"Bytes received: %d\n", iResult);
-            }
-            else if ( iResult == 0 )
-                wprintf(L"Connection closed\n");
-            else
-                wprintf(L"recv failed: %d\n", WSAGetLastError());
-
-            if (strcmp(recvbuf,"secret") == 0) {
-                cout << "client say 'secret'" << endl;
-                secret = true;
-                break;
-            }
-
-            //----------------------
-            // Send an initial buffer
-            iResult = send( m_acs[i], recvbuf, DEFAULT_BUFLEN, 0);
-            if (iResult == SOCKET_ERROR) {
-                wprintf(L"send failed with error: %d\n", WSAGetLastError());
-                closesocket(m_acs[i]);
-                WSACleanup();
-                throw 6;
-            }
+        int iResult = readn(sock, recvbuf, recvbuflen);
+        if ( iResult > 0 ) {
+            printf("%s\n",recvbuf);
+            wprintf(L"Bytes received: %d\n", iResult);
         }
-        if (secret)
-        {
+        else if ( iResult == 0 )
+            wprintf(L"Connection closed\n");
+        else
+            wprintf(L"recv failed: %d\n", WSAGetLastError());
+
+        if (strcmp(recvbuf,"secret") == 0) {
+            cout << "client say 'secret'" << endl;
             // shutdown the connection since no more data will be sent
-            int iResult = shutdown(m_acs[i], SD_SEND);
+            int iResult = shutdown(sock, SD_SEND);
             if (iResult == SOCKET_ERROR) {
                 printf("shutdown failed: %d\n", WSAGetLastError());
-                closesocket(m_acs[i]);
+                closesocket(sock);
                 WSACleanup();
                 throw 7;
             }
-            closesocket(m_acs[i]);
-            vector<SOCKET>::const_iterator for_del = m_acs.begin()+i;
-            m_acs.erase(for_del);
+            closesocket(sock);
+            ths.erase(sock);
+            break;
+        }
+
+        //----------------------
+        // Send an initial buffer
+        iResult = send( sock, recvbuf, DEFAULT_BUFLEN, 0);
+        if (iResult == SOCKET_ERROR) {
+            wprintf(L"send failed with error: %d\n", WSAGetLastError());
+            closesocket(sock);
+            WSACleanup();
+            throw 6;
         }
     }
 }
@@ -186,7 +177,7 @@ void MyServer::start()
 {
     m_stop = false;
     acc = shared_ptr<thread>( new thread(&MyServer::my_accept, this) );
-    run = shared_ptr<thread>( new thread(&MyServer::exchange, this) );
+    //run = shared_ptr<thread>( new thread(&MyServer::exchange, this) );
     acc->join();
-    run->join();
+    //run->join();
 }

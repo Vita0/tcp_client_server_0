@@ -10,6 +10,7 @@
 
 #include <Winsock2.h>
 #include <vector>
+#include <map>
 #include "thread"
 #include <memory>
 
@@ -28,11 +29,12 @@ class MyServer
     bool m_stop;
     shared_ptr<thread> acc;
     shared_ptr<thread> run;
+    map<SOCKET,shared_ptr<thread>> ths;
 public:
     MyServer(const char *ip, u_short port);
     ~MyServer();
     void my_accept();
-    void exchange();
+    void exchange(SOCKET sock);
     void start();
 };
 
