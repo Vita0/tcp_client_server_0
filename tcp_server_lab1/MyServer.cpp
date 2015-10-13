@@ -160,7 +160,12 @@ void MyServer::exchange(SOCKET sock)
             ths.erase(sock);
             break;
         }
-
+        
+//        for(int j = 0; j<10; ++j)
+//        {
+//            std::this_thread::__sleep_for(std::chrono::seconds(1), std::chrono::nanoseconds(0));
+//            cout << "thread " << sock << " sleeping " << j << "s" << endl;
+//        }
         //----------------------
         // Send an initial buffer
         iResult = send( sock, recvbuf, DEFAULT_BUFLEN, 0);
