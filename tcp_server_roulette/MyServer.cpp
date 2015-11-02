@@ -1,3 +1,6 @@
+#include <thread>
+#include <chrono>
+
 #include "MyServer.h"
 
 MyServer::MyServer(const char* ip, u_short port)
@@ -51,13 +54,13 @@ MyServer::~MyServer()
 void MyServer::start()
 {
     m_started = true;
-    m_accept_thread = shared_ptr<thread>( new thread(&MyServer::my_accept, this) );
+    m_accept_thread = shared_ptr<thread>( new thread(&MyServer::myAccept, this) );
     m_comands_thread = shared_ptr<thread>( new thread(&MyServer::getCommands, this) );
     m_comands_thread->join();
     m_accept_thread->join();
 }
 
-void MyServer::my_accept()
+void MyServer::myAccept()
 {
     while (m_started)
     {
@@ -92,18 +95,58 @@ void MyServer::my_accept()
             wprintf(L"%d\n", cl_service.sin_port);
             wprintf(L"  Server create new socket for client, that IP:PORT - %s:", inet_ntoa((in_addr) ac_service.sin_addr));
             wprintf(L"%d\n", ac_service.sin_port);
-            
+            cout << "player id " << ac_sock << endl;
             m_clients_mutex.lock();
             m_clients.insert(make_pair(ac_sock, Player(ac_sock)));
-            
+            m_clients.at(ac_sock).start();
             m_clients_mutex.unlock();
         }
     }
-    auto end = ths.end();
-    for(auto i=ths.begin(); i != end; ++i)
+    m_clients_mutex.lock();
+    auto end = m_clients.end();
+    for(auto i=m_clients.begin(); i != end; ++i)
     {
-        cout << "join: " << i->first << " ... " << endl;
-        i->second->join();
+        m_cout_mutex.lock();
+        cout << "myAccept: client" << i->first << " stoping ... ";
+        m_cout_mutex.unlock();
+        
+        i->second.stop();
+        
+        m_cout_mutex.lock();
+        cout << "ok!" << endl;
+        m_cout_mutex.unlock();
+        
         closesocket(i->first);
+    }
+    m_clients_mutex.unlock();
+}
+
+void MyServer::getCommands()
+{
+    string s;
+    while (m_started)
+    {
+        s = "";
+        getline(cin, s);
+        if (s.substr(0,4) == "kill")
+        {
+            int a = atoi(s.substr(4,6).c_str());
+            m_clients_mutex.lock();
+            auto it = m_clients.find(a);
+            if (it != m_clients.end())
+            {
+                m_clients.at(a).stop();
+            }
+            else
+            {
+                cout << "bad command" << endl;
+            }
+            m_clients_mutex.unlock();
+        }
+        else if (s == "stop")
+        {
+            m_started = false;
+            closesocket(m_listen);
+        }
     }
 }

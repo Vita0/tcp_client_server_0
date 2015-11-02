@@ -20,8 +20,18 @@ using namespace std;
 
 class Player {
     bool m_started;
-    Player(SOCKET sock);//start thread
-    ~Player();//join thread
+    SOCKET m_socket;
+public:
+    shared_ptr<thread> m_recv_thread;
+    shared_ptr<thread> m_send_thread;
+    Player(SOCKET sock);
+    ~Player();
+    void start();//start thread
+    void stop();//join thread
+    void recv();
+    void send();
+private:
+    Player();
 };
 
 class MyServer {
@@ -40,7 +50,7 @@ public:
     MyServer(const char *ip, u_short port);
     ~MyServer();
     void start();
-    void my_accept();
+    void myAccept();
     void exchange(SOCKET sock);
     void getCommands();
 };
@@ -48,3 +58,5 @@ public:
 
 #endif	/* MYSERVER_H */
 
+//TODO game logic
+//TODO server accept whithout errors
