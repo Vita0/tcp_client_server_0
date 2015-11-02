@@ -7,6 +7,8 @@
 
 #pragma comment(lib,"wsock32.lib")
 
+#include "MyServer.h"
+
 using namespace std;
 
 /*
