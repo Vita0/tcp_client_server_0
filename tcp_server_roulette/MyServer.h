@@ -58,5 +58,6 @@ public:
 
 #endif	/* MYSERVER_H */
 
+//TODO use class Player in client app
 //TODO game logic
 //TODO server accept whithout errors
