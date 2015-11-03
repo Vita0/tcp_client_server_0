@@ -21,25 +21,39 @@ using namespace std;
 class Player {
     bool m_started;
     SOCKET m_socket;
-public:
     shared_ptr<thread> m_recv_thread;
     shared_ptr<thread> m_send_thread;
+public:
     Player(SOCKET sock);
-    ~Player();
-    void start();//start thread
-    void stop();//join thread
-    void recv();
-    void send();
+    virtual ~Player();
+    virtual void start() final;//start thread
+    virtual void stop() final;//join thread
+    virtual void recv() final;
+    virtual void send() final;
+protected:
+    virtual void my_recv() = 0;
+    virtual void my_send() = 0;
 private:
     Player();
+};
+
+class ServerSidePlayer: public Player
+{
+public:
+    ServerSidePlayer(SOCKET sock);
+    virtual ~ServerSidePlayer();
+private:
+    virtual void my_recv();
+    virtual void my_send();
+private:
+    ServerSidePlayer();
 };
 
 class MyServer {
 private:
     mutex m_cout_mutex;
     mutex m_clients_mutex;
-    map<SOCKET,Player> m_clients;
-    map<SOCKET,pair<shared_ptr<thread>,shared_ptr<thread>>> m_clients_threads;
+    map<SOCKET,ServerSidePlayer> m_clients;
     SOCKET m_listen;
     
     bool m_started;
@@ -60,4 +74,4 @@ public:
 
 //TODO use class Player in client app
 //TODO game logic
-//TODO server accept whithout errors
+//TODO server accept whithout errors - may be because netbeans can't understand windows function / or some mingw problem

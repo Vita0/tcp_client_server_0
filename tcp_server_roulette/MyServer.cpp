@@ -22,8 +22,10 @@ MyServer::MyServer(const char* ip, u_short port)
     }
     
     //nonblocking
-    //u_int nb = 1;
+    //u_int nb = 1; //must be u_long 
     //int res = ioctlsocket(m_listen, FIONBIO, &nb);
+    //if (res != NO_ERROR)
+    //    wprintf(L"ioctlsocket failed with error: %ld\n", res);
     
     sockaddr_in service;
     service.sin_family = AF_INET;
@@ -70,13 +72,21 @@ void MyServer::myAccept()
         //nonblocking
         //u_int nb = 1;
         //int res = ioctlsocket(ac_sock, FIONBIO, &nb);
-
+        //if (res != NO_ERROR)
+        //    wprintf(L"ioctlsocket failed with error: %ld\n", res);
+        
+        this_thread::sleep_for(chrono::microseconds(1000));
+        
+        cout << "accept now ...";
         ac_sock = accept(m_listen, NULL, NULL);
+        cout << "accept ok!" << endl;
         if (ac_sock == INVALID_SOCKET) {
             wprintf(L"accept failed with error: %ld\n", WSAGetLastError());
             closesocket(m_listen);
             //WSACleanup();
             break;
+        } if (ac_sock == WSAEWOULDBLOCK) {
+            continue;
         } else {
             sockaddr_in ac_service;
             int len = sizeof(ac_service);
@@ -97,7 +107,7 @@ void MyServer::myAccept()
             wprintf(L"%d\n", ac_service.sin_port);
             cout << "player id " << ac_sock << endl;
             m_clients_mutex.lock();
-            m_clients.insert(make_pair(ac_sock, Player(ac_sock)));
+            m_clients.insert(make_pair(ac_sock, ServerSidePlayer(ac_sock)));
             m_clients.at(ac_sock).start();
             m_clients_mutex.unlock();
         }
