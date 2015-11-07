@@ -107,7 +107,7 @@ void MyServer::myAccept()
             wprintf(L"%d\n", ac_service.sin_port);
             cout << "player id " << ac_sock << endl;
             m_clients_mutex.lock();
-            m_clients.insert(make_pair(ac_sock, ServerSidePlayer(ac_sock)));
+            m_clients.insert(make_pair(ac_sock, Player(ac_sock, &m_game, &m_game_mutex)));
             m_clients.at(ac_sock).start();
             m_clients_mutex.unlock();
         }
@@ -126,6 +126,11 @@ void MyServer::myAccept()
         cout << "ok!" << endl;
         m_cout_mutex.unlock();
         
+        int iResult = shutdown(i->first, SD_SEND);
+        if (iResult == SOCKET_ERROR) {
+            wprintf(L"shutdown failed: %d\n", WSAGetLastError());
+            closesocket(i->first);
+        }
         closesocket(i->first);
     }
     m_clients_mutex.unlock();

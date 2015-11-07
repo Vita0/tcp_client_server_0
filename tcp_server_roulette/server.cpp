@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
         MyServer server("127.0.0.1",27015);
         server.start();     //run this, until server don't get command stop in his thread
     }
-    catch (...) { cout << "some error" << endl; }
+    catch (int &er) { cout << "some error: " << er << endl; }
     return 0;
 }
 
