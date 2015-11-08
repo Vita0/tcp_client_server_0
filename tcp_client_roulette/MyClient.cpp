@@ -1,5 +1,7 @@
 #include "MyClient.h"
 #include <cstring>
+#include <cstdio>
+#include <string>
 
 int readn(SOCKET fd, char *data, size_t data_len)
 {
@@ -24,8 +26,23 @@ int readn(SOCKET fd, char *data, size_t data_len)
     return data_len;
 }
 
-MyClient::MyClient(const char* server_ip, u_short server_port)
+MyClient::MyClient(const char *server_ip, u_short server_port)
+    :m_started(false)
+    ,m_players_count(4)
+    ,m_number("")
+    ,m_croupier("")
 {
+    m_pls.resize(m_players_count);
+    for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
+    {
+        i->socket = 0; i->money = 0; i->last_bet = 0; i->last_win = 0;
+    }
+    for(int i = 0; i < 5; ++i)
+    {
+        addError(m_server_errors,"");
+        addError(m_client_errors,"");
+    }
+    
     WSADATA wsaData;
     // The WSAStartup function initiates use of the Winsock DLL by a process.
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -47,8 +64,9 @@ MyClient::MyClient(const char* server_ip, u_short server_port)
     // The sockaddr_in structure specifies the address family,
     // IP address, and port of the server to be connected to.
     clientService.sin_family = AF_INET;
-    clientService.sin_addr.s_addr = inet_addr( server_ip );
-    clientService.sin_port = htons( server_port );
+    clientService.sin_addr.s_addr = inet_addr(server_ip);
+	//clientService.sin_addr.s_addr = inet_pton(AF_INET,);
+    clientService.sin_port = htons(server_port);
 
     //----------------------
     // Connect to server.
@@ -98,10 +116,11 @@ void MyClient::mySend()
 
 void MyClient::myRecv()
 {
-    const int recvbuflen = 260;
-    char recvbuf[recvbuflen+1];
     while (m_started)
     {
+        updateScreen();
+        const int recvbuflen = 260;
+        char recvbuf[recvbuflen+1];
         int iResult = readn(m_socket, recvbuf, recvbuflen);
         if ( iResult > 0 ) {
             wprintf(L"%s\n",recvbuf);
@@ -111,20 +130,60 @@ void MyClient::myRecv()
             wprintf(L"Connection closed\n");
             m_started = false;
         }
-        else
+        else {
             wprintf(L"recv failed: %d\n", WSAGetLastError());
-        
+            m_started = false;
+        }
 //        if (strcmp(recvbuf,"secret") == 0) {
 //            cout << "client say 'secret'" << endl;
 //            break;
 //        }
+        const int buflen = 10;
+        char buf[buflen+1];
         const int inc = 10;
         int idx = 0;
         
         if (strcmp(recvbuf+idx, "info") == 0)
         {
-            cout << "is info" << endl;
-            
+            idx += inc;
+            //sscanf (recvbuf+idx,"%s",buf);
+            m_number = recvbuf+idx;
+            idx += inc;
+            if (strcmp(recvbuf+idx, "croupier") != 0)
+                addError(m_client_errors, "protocol error: info - field croupier not found");
+            idx += inc;
+            m_croupier = recvbuf+idx;
         }
     }
+}
+
+void MyClient::updateScreen()
+{
+    cout << "\033[2J\033[1;1H"; //clear screen
+    string croupier = (m_croupier=="0")?"waiting croupier":m_croupier;
+    cout << "            info:" << endl;
+    cout << "                    croupier: " << croupier << endl << endl;
+    cout << "                     <player>  <money>           you number is " << m_number << endl;
+    for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
+    cout << "                    " << i->socket << "\t\t" << i->money << endl;
+    cout << "       last bets:" << endl;
+    cout << "                     <player>   <bet>     <win>" << endl;
+    for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
+    cout << "                    " << i->socket << "\t\t" << i->last_bet << "\t" << i->last_win << endl;
+    cout << " last (s) errors:" << endl;
+    for(auto error = m_server_errors.begin(); error != m_server_errors.end(); ++error)
+    cout << "                 " << *error << endl;
+    cout << " last (c) errors:" << endl;
+    for(auto error = m_client_errors.begin(); error != m_client_errors.end(); ++error)
+    cout << "                 " << *error << endl;
+}
+
+
+void MyClient::addError(deque<string> &deq, const string &s)
+{
+    if (deq.size() == 5)
+    {
+        deq.pop_front();
+    }
+    deq.push_back(s);
 }

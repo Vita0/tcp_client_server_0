@@ -61,42 +61,42 @@ void Player::mySend()
         SOCKET cr = m_game->getCroupier();
         m_game_mutex->unlock();
         
-        const int recvbuflen = 260;
-        char recvbuf[recvbuflen+1];
+        const int sendbuflen = 260;
+        char sendbuf[sendbuflen+1];
         const int inc = 10;
         int idx = 0;
         
         //info
         idx = 0;
-        strcpy(recvbuf+idx, "info");
+        strcpy(sendbuf+idx, "info");
         
         idx += inc;
-        sprintf(recvbuf+idx, "%d", m_socket);
+        sprintf(sendbuf+idx, "%d\0", m_socket);
         
         idx += inc;
-        strcpy(recvbuf+idx, "croupier");
+        strcpy(sendbuf+idx, "croupier");
         idx += inc;
-        sprintf(recvbuf+idx, "%d", cr);
+        sprintf(sendbuf+idx, "%d\0", cr);
         
         for(const Game::GamePlayer &i: pls)
         {
             idx += inc;
-            strcpy(recvbuf+idx, "player");
+            strcpy(sendbuf+idx, "player");
             idx += inc;
-            sprintf(recvbuf+idx, "%d", i.socket);
+            sprintf(sendbuf+idx, "%d\0", i.socket);
             idx += inc;
-            sprintf(recvbuf+idx, "%d", i.money);
+            sprintf(sendbuf+idx, "%d\0", i.money);
         }
         for(int i = 0; i < m_game->m_maxPlayersCountValue - pls.size(); ++i);
         {
             idx += inc;
-            strcpy(recvbuf+idx, "player");
+            strcpy(sendbuf+idx, "player");
             idx += inc;
-            sprintf(recvbuf+idx, "%d", 0);
+            sprintf(sendbuf+idx, "%d\0", 0);
             idx += inc;
-            sprintf(recvbuf+idx, "%d", 0);
+            sprintf(sendbuf+idx, "%d\0", 0);
         }
-        int iResult = send( m_socket, recvbuf, recvbuflen, 0);
+        int iResult = send( m_socket, sendbuf, sendbuflen, 0);
         if (iResult == SOCKET_ERROR) {
             wprintf(L"send failed with error: %d\n", WSAGetLastError());
             closesocket(m_socket);

@@ -139,6 +139,6 @@ public:
 
 #endif	/* MYSERVER_H */
 
-//TODO use class Player in client app
-//TODO game logic
+
+//TODO remove player, when recive failed
 //TODO server accept whithout errors - may be because netbeans can't understand windows function / or some mingw problem
