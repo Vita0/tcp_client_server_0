@@ -54,11 +54,12 @@ void Player::mySend()
     while (m_started)
     {
         this_thread::sleep_for(chrono::microseconds(1000000));
-        cout << "send" << endl;
         
         m_game_mutex->lock();
         vector<Game::GamePlayer> pls = m_game->getPlayerList();
         SOCKET cr = m_game->getCroupier();
+        short rv = m_game->getRouletteValue();
+        short maxPls = m_game->m_maxPlayersCountValue;
         m_game_mutex->unlock();
         
         const int sendbuflen = 260;
@@ -71,23 +72,29 @@ void Player::mySend()
         strcpy(sendbuf+idx, "info");
         
         idx += inc;
-        sprintf(sendbuf+idx, "%d\0", m_socket);
+        sprintf(sendbuf+idx, "%d", m_socket);
+        idx += inc;
+        sprintf(sendbuf+idx, "%d", rv);
         
         idx += inc;
         strcpy(sendbuf+idx, "croupier");
         idx += inc;
-        sprintf(sendbuf+idx, "%d\0", cr);
+        sprintf(sendbuf+idx, "%d", cr);
         
         for(const Game::GamePlayer &i: pls)
         {
             idx += inc;
             strcpy(sendbuf+idx, "player");
             idx += inc;
-            sprintf(sendbuf+idx, "%d\0", i.socket);
+            sprintf(sendbuf+idx, "%d", i.socket);
             idx += inc;
-            sprintf(sendbuf+idx, "%d\0", i.money);
+            sprintf(sendbuf+idx, "%d", i.money);
+            idx += inc;
+            sprintf(sendbuf+idx, "%d", i.last_bet);
+            idx += inc;
+            sprintf(sendbuf+idx, "%d", i.last_win);
         }
-        for(int i = 0; i < m_game->m_maxPlayersCountValue - pls.size(); ++i);
+        for(int i = 0; i < maxPls - pls.size(); ++i)
         {
             idx += inc;
             strcpy(sendbuf+idx, "player");
@@ -95,7 +102,12 @@ void Player::mySend()
             sprintf(sendbuf+idx, "%d\0", 0);
             idx += inc;
             sprintf(sendbuf+idx, "%d\0", 0);
+            idx += inc;
+            sprintf(sendbuf+idx, "%d\0", 0);
+            idx += inc;
+            sprintf(sendbuf+idx, "%d\0", 0);
         }
+        cout << "send, idx = " << idx << endl;
         int iResult = send( m_socket, sendbuf, sendbuflen, 0);
         if (iResult == SOCKET_ERROR) {
             wprintf(L"send failed with error: %d\n", WSAGetLastError());

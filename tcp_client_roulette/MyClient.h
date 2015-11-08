@@ -30,7 +30,7 @@ private:
     
     struct GamePlayer
     {
-        SOCKET socket;
+        int socket;
         int money;
         int last_bet;
         int last_win;
@@ -38,6 +38,7 @@ private:
     //screen
     string m_number;
     string m_croupier;
+    string m_roulette_value;
     vector<GamePlayer> m_pls;
     deque<string> m_server_errors;
     deque<string> m_client_errors;

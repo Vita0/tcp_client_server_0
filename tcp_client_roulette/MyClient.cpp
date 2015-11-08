@@ -31,16 +31,17 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     ,m_players_count(4)
     ,m_number("")
     ,m_croupier("")
+    ,m_roulette_value("")
 {
     m_pls.resize(m_players_count);
     for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
     {
         i->socket = 0; i->money = 0; i->last_bet = 0; i->last_win = 0;
     }
-    for(int i = 0; i < 5; ++i)
+    for(int i = 0; i < 3; ++i)
     {
-        addError(m_server_errors,"");
-        addError(m_client_errors,"");
+        m_server_errors.push_back("");
+        m_client_errors.push_back("");
     }
     
     WSADATA wsaData;
@@ -107,9 +108,6 @@ void MyClient::mySend()
 {
     while (m_started)
     {
-        this_thread::sleep_for(chrono::microseconds(1000000));
-        //cout << "send" << endl;
-        
         
     }
 }
@@ -134,10 +132,7 @@ void MyClient::myRecv()
             wprintf(L"recv failed: %d\n", WSAGetLastError());
             m_started = false;
         }
-//        if (strcmp(recvbuf,"secret") == 0) {
-//            cout << "client say 'secret'" << endl;
-//            break;
-//        }
+
         const int buflen = 10;
         char buf[buflen+1];
         const int inc = 10;
@@ -146,30 +141,49 @@ void MyClient::myRecv()
         if (strcmp(recvbuf+idx, "info") == 0)
         {
             idx += inc;
-            //sscanf (recvbuf+idx,"%s",buf);
             m_number = recvbuf+idx;
+            idx += inc;
+            m_roulette_value = recvbuf+idx;
             idx += inc;
             if (strcmp(recvbuf+idx, "croupier") != 0)
                 addError(m_client_errors, "protocol error: info - field croupier not found");
             idx += inc;
             m_croupier = recvbuf+idx;
+            for(GamePlayer &i: m_pls)
+            {
+                idx += inc;
+                if (strcmp(recvbuf+idx, "player") != 0)
+                    addError(m_client_errors, "protocol error: info - field player not found");
+                idx += inc;
+                i.socket = atoi(recvbuf+idx);
+                idx += inc;
+                i.money = atoi(recvbuf+idx);
+                idx += inc;
+                i.last_bet = atoi(recvbuf+idx);
+                idx += inc;
+                i.last_win = atoi(recvbuf+idx);
+            }
+            cout << "recv, idx = " << idx << endl;
+        }
+        else if (strcmp(recvbuf+idx,"stop") == 0) {
+            cout << "server say 'stop'" << endl;
+            m_started = false;
+            break;
         }
     }
 }
-
+const string NO_VALUE = "37";
 void MyClient::updateScreen()
 {
     cout << "\033[2J\033[1;1H"; //clear screen
     string croupier = (m_croupier=="0")?"waiting croupier":m_croupier;
+    string roulette_value = (m_roulette_value==NO_VALUE)?"was now games yet":m_roulette_value;
     cout << "            info:" << endl;
-    cout << "                    croupier: " << croupier << endl << endl;
-    cout << "                     <player>  <money>           you number is " << m_number << endl;
+    cout << "                    croupier: " << croupier << "     you number: " << m_number << endl << endl;
+    cout << "                             last roulette value: " << roulette_value << endl;
+    cout << "                     <player>      <money>         <bet>       <win>" << endl;
     for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
-    cout << "                    " << i->socket << "\t\t" << i->money << endl;
-    cout << "       last bets:" << endl;
-    cout << "                     <player>   <bet>     <win>" << endl;
-    for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
-    cout << "                    " << i->socket << "\t\t" << i->last_bet << "\t" << i->last_win << endl;
+    cout << "                    " << i->socket << "\t\t" << i->money << "\t\t" << i->last_bet << "\t\t" << i->last_win << endl;
     cout << " last (s) errors:" << endl;
     for(auto error = m_server_errors.begin(); error != m_server_errors.end(); ++error)
     cout << "                 " << *error << endl;
@@ -181,9 +195,11 @@ void MyClient::updateScreen()
 
 void MyClient::addError(deque<string> &deq, const string &s)
 {
-    if (deq.size() == 5)
+    if (deq.size() == 3)
     {
-        deq.pop_front();
+        deq.pop_back();
     }
-    deq.push_back(s);
+    if ( !deq.empty() )
+        if (*deq.begin() != s)
+            deq.push_front(s);
 }

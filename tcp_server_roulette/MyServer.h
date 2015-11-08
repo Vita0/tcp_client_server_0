@@ -84,6 +84,7 @@ public:
     }
     SOCKET getCroupier() { return m_croupier; };
     vector<Game::GamePlayer> getPlayerList() { return m_players; }
+    short getRouletteValue() { return m_rouletteValue; }
 };
 
 class MyServer;
