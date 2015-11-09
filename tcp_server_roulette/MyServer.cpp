@@ -142,7 +142,9 @@ void MyServer::getCommands()
     while (m_started)
     {
         s = "";
+        cout << "wait command..." << endl;
         getline(cin, s);
+        cout << "wait command...ok!" << endl;
         if (s.substr(0,4) == "kill")
         {
             int a = atoi(s.substr(4,6).c_str());
@@ -150,6 +152,9 @@ void MyServer::getCommands()
             auto it = m_clients.find(a);
             if (it != m_clients.end())
             {
+                m_game_mutex.lock();
+                m_game.delPlayer(a);
+                m_game_mutex.unlock();
                 m_clients.at(a).stop();
             }
             else

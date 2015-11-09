@@ -39,6 +39,7 @@ private:
     string m_number;
     string m_croupier;
     string m_roulette_value;
+    string m_commandInfo;
     vector<GamePlayer> m_pls;
     deque<string> m_server_errors;
     deque<string> m_client_errors;

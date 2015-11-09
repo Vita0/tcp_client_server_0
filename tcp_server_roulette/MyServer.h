@@ -43,7 +43,6 @@ private:
     StateType m_state;
     SOCKET m_croupier;
 
-    short m_playersCount;
     short m_rouletteValue;
     string m_croupierPassword;
     vector<Game::GamePlayer> m_players;
@@ -51,16 +50,13 @@ public:
     Game() :m_maxPlayersCountValue(4)
            ,m_state(WAITING_CROUPIER)
            ,m_croupier(0)
-           ,m_playersCount(0)
            ,m_rouletteValue(NO_VALUE)
            ,m_croupierPassword("password")
     {};
     virtual ~Game(){};
-    void setCroupier(SOCKET sock) { m_croupier = sock; m_state = WAITING_START; return; }
+    void setCroupier(SOCKET sock) { m_croupier = sock; m_state = WAITING_START; m_players.resize(0); return; }
     void clrCroupier() { m_croupier = 0; m_state = WAITING_CROUPIER; return; }
-    short getPlayersCount() { return m_playersCount; }
-    void incPlayersCount() { ++m_playersCount; return; }
-    void decPlayersCount() { --m_playersCount; return; }
+    short getPlayersCount() { return m_players.size(); }
     bool checkCroupierPassword(string s) { return s == m_croupierPassword; }
     void addPlayer(SOCKET sock, int money)
     {
@@ -73,6 +69,10 @@ public:
     }
     void delPlayer(SOCKET sock)
     {
+        if (sock == m_croupier)
+        {
+            clrCroupier();
+        }
         for(auto it = m_players.begin(); it != m_players.end(); ++it)
         {
             if (it->socket == sock)

@@ -1,6 +1,7 @@
 #include "MyClient.h"
 #include <cstring>
-#include <cstdio>
+//#include <cstdio>
+#include <stdio.h>
 #include <string>
 
 int readn(SOCKET fd, char *data, size_t data_len)
@@ -32,6 +33,7 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     ,m_number("")
     ,m_croupier("")
     ,m_roulette_value("")
+    ,m_commandInfo("")
 {
     m_pls.resize(m_players_count);
     for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
@@ -108,7 +110,54 @@ void MyClient::mySend()
 {
     while (m_started)
     {
+        m_commandInfo = "enter command:";
+        updateScreen();
+        string s;
+        cin >> s;
+        if (!m_started) break;
+        const int sendbuflen = 70;
+        char sendbuf[sendbuflen+1];
+        const int inc = 10;
+        int idx = 0;
         
+        if (s == "enter_p")
+        {
+            idx = 0;
+            strcpy(sendbuf+idx, s.c_str());
+            int money = 0;
+            m_commandInfo = "enter MONEY:";
+            updateScreen();
+            cin >> money;
+            if (money <= 0)
+            {
+                addError(m_client_errors, "wrong money!");
+                continue;
+            }
+            idx += inc;
+            sprintf(sendbuf+idx, "%d", money);
+        }
+        else if (s == "enter_c")
+        {
+            idx = 0;
+            strcpy(sendbuf+idx, s.c_str());
+            string pass;
+            m_commandInfo = "enter PASSWORD:";
+            updateScreen();
+            cin >> pass;
+            idx += inc;
+            sprintf(sendbuf+idx, "%s", pass.c_str());
+        }
+        else 
+        {
+            addError(m_client_errors, "wrong command!");
+            continue;
+        }
+        int iResult = send( m_socket, sendbuf, sendbuflen, 0);
+        if (iResult == SOCKET_ERROR) {
+            wprintf(L"send failed with error: %d\n", WSAGetLastError());
+            closesocket(m_socket);
+            throw 6;
+        }
     }
 }
 
@@ -165,9 +214,25 @@ void MyClient::myRecv()
             }
             cout << "recv, idx = " << idx << endl;
         }
-        else if (strcmp(recvbuf+idx,"stop") == 0) {
+        else if (strcmp(recvbuf+idx,"error") == 0)
+        {
+            idx += inc;
+            string er = recvbuf+idx;
+            addError(m_server_errors, er);
+        }
+        else if (strcmp(recvbuf+idx,"stop") == 0)
+        {
             cout << "server say 'stop'" << endl;
             m_started = false;
+            const int sendbuflen = 70;
+            char sendbuf[sendbuflen+1];
+            strcpy(sendbuf,"bye");
+            int iResult = send( m_socket, sendbuf, sendbuflen, 0);
+            if (iResult == SOCKET_ERROR) {
+                wprintf(L"send failed with error: %d\n", WSAGetLastError());
+                closesocket(m_socket);
+                throw 6;
+            }
             break;
         }
     }
@@ -190,6 +255,7 @@ void MyClient::updateScreen()
     cout << " last (c) errors:" << endl;
     for(auto error = m_client_errors.begin(); error != m_client_errors.end(); ++error)
     cout << "                 " << *error << endl;
+    cout << "    command info:" << m_commandInfo << endl;
 }
 
 
