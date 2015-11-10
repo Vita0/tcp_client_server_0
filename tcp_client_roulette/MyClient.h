@@ -18,6 +18,19 @@
 
 using namespace std;
 
+namespace BET_TYPE
+{
+    const string onesecond = "1/2";
+    const string twosecond = "2/2";
+    const string even = "even";
+    const string odd = "odd";
+    const string number = "number";
+    const string no_bet = "no bet";
+//    const string onethird = "1/3";
+//    const string twothird = "2/3";
+//    const string treethird = "3/3";
+}
+
 class MyClient
 {
 private:
@@ -28,12 +41,24 @@ private:
     shared_ptr<thread> m_recv_thread;
     shared_ptr<thread> m_send_thread;
     
+    struct Bet
+    {
+        Bet()
+           :betValue(BET_TYPE::no_bet)
+           ,number(" ")
+           ,money(" ")
+        {}
+        string betValue;
+        string number;
+        string money;
+    };
     struct GamePlayer
     {
         int socket;
         int money;
         int last_bet;
         int last_win;
+        Bet bet;
     };
     //screen
     string m_number;

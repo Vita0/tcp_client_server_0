@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <string>
 
+const string NO_VALUE = "37";
+const short NO_VALUE_SHORT = 37;
+
 int readn(SOCKET fd, char *data, size_t data_len)
 {
     int cnt;
@@ -112,7 +115,7 @@ void MyClient::mySend()
     {
         m_commandInfo = "enter command:";
         updateScreen();
-        string s;
+        string s = "";
         cin >> s;
         if (!m_started) break;
         const int sendbuflen = 70;
@@ -147,6 +150,73 @@ void MyClient::mySend()
             idx += inc;
             sprintf(sendbuf+idx, "%s", pass.c_str());
         }
+        else if (s == "bet")
+        {
+            idx = 0;
+            strcpy(sendbuf+idx, s.c_str());
+            m_commandInfo = "enter BET TYPE:";
+            updateScreen();
+            cin >> s;
+            if (s == "even" || s == "odd" || s == "1/2" || s == "2/2")
+            {
+                idx += inc;
+                strcpy(sendbuf+idx, s.c_str());
+                int money;
+                m_commandInfo = "enter BET MONEY:";
+                updateScreen();
+                cin >> money;
+                if (money>0)
+                {
+                    idx += inc;
+                    sprintf(sendbuf+idx, "%d\0", money);
+                }
+                else
+                {
+                    addError(m_client_errors, "wrong money!");
+                    continue;
+                }
+            }
+            else if (s == "number")
+            {
+                idx += inc;
+                strcpy(sendbuf+idx, s.c_str());
+                m_commandInfo = "enter BET NUMBER:";
+                updateScreen();
+                short number;
+                cin >> number;
+                if (number>0 && number<NO_VALUE_SHORT)
+                {
+                    idx += inc;
+                    sprintf(sendbuf+idx, "%d\0", number);
+                    m_commandInfo = "enter BET MONEY:";
+                    updateScreen();
+                    int money;
+                    cin >> money;
+                    if (money>0)
+                    {
+                        idx += inc;
+                        sprintf(sendbuf+idx, "%d\0", money);
+                    }
+                    else
+                    {
+                        addError(m_client_errors, "wrong money!");
+                        continue;
+                    }
+                }
+                else
+                {
+                    addError(m_client_errors, "wrong number!");
+                    continue;
+                }
+            }
+            else
+            {
+                addError(m_client_errors, "wrong bet!");
+                continue;
+            }
+            
+            
+        }
         else 
         {
             addError(m_client_errors, "wrong command!");
@@ -166,7 +236,7 @@ void MyClient::myRecv()
     while (m_started)
     {
         updateScreen();
-        const int recvbuflen = 260;
+        const int recvbuflen = 380;
         char recvbuf[recvbuflen+1];
         int iResult = readn(m_socket, recvbuf, recvbuflen);
         if ( iResult > 0 ) {
@@ -211,6 +281,12 @@ void MyClient::myRecv()
                 i.last_bet = atoi(recvbuf+idx);
                 idx += inc;
                 i.last_win = atoi(recvbuf+idx);
+                idx += inc;
+                i.bet.betValue = recvbuf+idx;
+                idx += inc;
+                i.bet.number = atoi(recvbuf+idx);
+                idx += inc;
+                i.bet.money = atoi(recvbuf+idx);
             }
             cout << "recv, idx = " << idx << endl;
         }
@@ -237,7 +313,7 @@ void MyClient::myRecv()
         }
     }
 }
-const string NO_VALUE = "37";
+
 void MyClient::updateScreen()
 {
     cout << "\033[2J\033[1;1H"; //clear screen
@@ -246,9 +322,11 @@ void MyClient::updateScreen()
     cout << "            info:" << endl;
     cout << "                    croupier: " << croupier << "     you number: " << m_number << endl << endl;
     cout << "                             last roulette value: " << roulette_value << endl;
-    cout << "                     <player>      <money>         <bet>       <win>" << endl;
+    cout << "                     <player>      <money>   <bet>  <number>  <money>    <last bet>  <last win> " << endl;
     for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
-    cout << "                    " << i->socket << "\t\t" << i->money << "\t\t" << i->last_bet << "\t\t" << i->last_win << endl;
+    cout << "                    " << i->socket << "\t\t" << i->money << "\t\t" << i->bet.betValue 
+                                    << "\t\t" << i->bet.number << "\t\t" << i->bet.money 
+                                    << "\t\t" << i->last_bet << "\t\t" << i->last_win << endl;
     cout << " last (s) errors:" << endl;
     for(auto error = m_server_errors.begin(); error != m_server_errors.end(); ++error)
     cout << "                 " << *error << endl;

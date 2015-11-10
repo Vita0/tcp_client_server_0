@@ -22,6 +22,19 @@ using namespace std;
 
 const short NO_VALUE = 37;
 
+namespace BET_TYPE
+{
+    const string onesecond = "1/2";
+    const string twosecond = "2/2";
+    const string even = "even";
+    const string odd = "odd";
+    const string number = "number";
+    const string no_bet = "no bet";
+//    const string onethird = "1/3";
+//    const string twothird = "2/3";
+//    const string treethird = "3/3";
+}
+
 class Game
 {
 public:
@@ -30,13 +43,31 @@ public:
         WAITING_CROUPIER,
         WAITING_START
     };
+    struct Bet
+    {
+        Bet(string betValue, int number, int money)
+           :betValue(betValue)
+           ,number(number)
+           ,money(money)
+        {}
+        Bet()
+           :betValue(BET_TYPE::no_bet)
+           ,number(NO_VALUE)
+           ,money(0)
+        {}
+        string betValue;
+        int number;
+        int money;
+    };
     struct GamePlayer
     {
         SOCKET socket;
         int money;
         int last_bet;
         int last_win;
+        Bet bet;
     };
+
 public:
     const short m_maxPlayersCountValue;
 private:
@@ -65,6 +96,8 @@ public:
         lol.money = money;
         lol.last_bet = 0;
         lol.last_win = 0;
+        Bet bet;
+        lol.bet = bet;
         m_players.push_back(lol);
     }
     void delPlayer(SOCKET sock)
@@ -85,6 +118,59 @@ public:
     SOCKET getCroupier() { return m_croupier; };
     vector<Game::GamePlayer> getPlayerList() { return m_players; }
     short getRouletteValue() { return m_rouletteValue; }
+    bool isNoBets(SOCKET s) { 
+        bool res = true;
+        for (auto it = m_players.begin(); it != m_players.end(); ++it)
+        {
+            if (it->socket == s)
+                res = it->bet.money <= 0; 
+        }
+        return res;
+    }
+    void setBet(string betValue, int number, int money, SOCKET s) {
+        for (auto it = m_players.begin(); it != m_players.end(); ++it)
+        {
+            if (it->socket == s)
+                it->bet = Bet(betValue, number, money);
+        }
+    }
+    void doBet(short rouletteValue, SOCKET s) {     
+        auto it = m_players.begin();
+        for (; it != m_players.end(); ++it)
+        {
+            if (it->socket == s) break;
+        }
+        if (it == m_players.end())
+            return;
+        
+        bool odd = rouletteValue%2;
+        bool onesecond = rouletteValue<(NO_VALUE-1)/2;
+        bool number = rouletteValue == it->bet.number;
+        int koef=0;
+        if (it->bet.betValue == BET_TYPE::odd) {
+            if (odd) koef = 2; 
+        } else if (it->bet.betValue == BET_TYPE::even) {
+            if (!odd) koef = 2; 
+        } else if (it->bet.betValue == BET_TYPE::onesecond) {
+            if (onesecond) koef = 2; 
+        } else if (it->bet.betValue == BET_TYPE::twosecond) {
+            if (!onesecond) koef = 2; 
+        } else if (it->bet.betValue == BET_TYPE::twosecond) {
+            if (number) koef = 36;
+        }
+        
+        m_rouletteValue = rouletteValue;
+        it->bet = Bet();
+    }
+    int getPlMoney(SOCKET s) {
+        int res = -1;
+        for (auto it = m_players.begin(); it != m_players.end(); ++it)
+        {
+            if (it->socket == s)
+                res = it->money;
+        }
+        return res;
+    }
 };
 
 class MyServer;
@@ -140,6 +226,6 @@ public:
 
 #endif	/* MYSERVER_H */
 
-
+//TODO rand in Player::doBet(short ))
 //TODO remove player, when recive failed
 //TODO server accept whithout errors - may be because netbeans can't understand windows function / or some mingw problem

@@ -62,7 +62,7 @@ void Player::mySend()
         short maxPls = m_game->m_maxPlayersCountValue;
         m_game_mutex->unlock();
         
-        const int sendbuflen = 260;
+        const int sendbuflen = 380;
         char sendbuf[sendbuflen+1];
         const int inc = 10;
         int idx = 0;
@@ -72,27 +72,33 @@ void Player::mySend()
         strcpy(sendbuf+idx, "info");
         
         idx += inc;
-        sprintf(sendbuf+idx, "%d", m_socket);
+        sprintf(sendbuf+idx, "%d\0", m_socket);
         idx += inc;
-        sprintf(sendbuf+idx, "%d", rv);
+        sprintf(sendbuf+idx, "%d\0", rv);
         
         idx += inc;
         strcpy(sendbuf+idx, "croupier");
         idx += inc;
-        sprintf(sendbuf+idx, "%d", cr);
+        sprintf(sendbuf+idx, "%d\0", cr);
         
         for(const Game::GamePlayer &i: pls)
         {
             idx += inc;
             strcpy(sendbuf+idx, "player");
             idx += inc;
-            sprintf(sendbuf+idx, "%d", i.socket);
+            sprintf(sendbuf+idx, "%d\0", i.socket);
             idx += inc;
-            sprintf(sendbuf+idx, "%d", i.money);
+            sprintf(sendbuf+idx, "%d\0", i.money);
             idx += inc;
-            sprintf(sendbuf+idx, "%d", i.last_bet);
+            sprintf(sendbuf+idx, "%d\0", i.last_bet);
             idx += inc;
-            sprintf(sendbuf+idx, "%d", i.last_win);
+            sprintf(sendbuf+idx, "%d\0", i.last_win);
+            idx += inc;
+            strcpy(sendbuf+idx, i.bet.betValue.c_str());
+            idx += inc;
+            sprintf(sendbuf+idx, "%d\0", i.bet.number);
+            idx += inc;
+            sprintf(sendbuf+idx, "%d\0", i.bet.money);
         }
         for(int i = 0; i < maxPls - pls.size(); ++i)
         {
@@ -104,6 +110,12 @@ void Player::mySend()
             sprintf(sendbuf+idx, "%d\0", 0);
             idx += inc;
             sprintf(sendbuf+idx, "%d\0", 0);
+            idx += inc;
+            sprintf(sendbuf+idx, "%d\0", 0);
+            idx += inc;
+            strcpy(sendbuf+idx, BET_TYPE::no_bet.c_str());
+            idx += inc;
+            sprintf(sendbuf+idx, "%d\0", NO_VALUE);
             idx += inc;
             sprintf(sendbuf+idx, "%d\0", 0);
         }
@@ -154,7 +166,6 @@ void Player::myRecv()
             m_game_mutex->lock();
             if (m_game->getPlayersCount() < m_game->m_maxPlayersCountValue)
             {
-                cout << "lol" << endl;
                 m_game->addPlayer(m_socket, money);
                 m_game_mutex->unlock();
             }
@@ -212,6 +223,65 @@ void Player::myRecv()
                 strcpy(sendbuf+sendidx, "error");
                 sendidx += inc;
                 strcpy(sendbuf+sendidx, "croupier place is busy");
+                int iResult = send( m_socket, sendbuf, sendbuflen, 0);
+                if (iResult == SOCKET_ERROR) {
+                    wprintf(L"send failed with error: %d\n", WSAGetLastError());
+                    closesocket(m_socket);
+                    throw 6;
+                }
+            }
+        }
+        else if (strcmp(recvbuf+idx, "bet") == 0)
+        {
+            m_game_mutex->lock();
+            int my_money = m_game->getPlMoney(m_socket);
+            m_game_mutex->unlock();
+            idx += inc;
+            string bet_type = recvbuf+idx;
+            string er = "";
+            int money = 0;
+            int number = NO_VALUE;
+            if (bet_type == BET_TYPE::even || bet_type == BET_TYPE::odd 
+                || bet_type == BET_TYPE::onesecond || bet_type == BET_TYPE::twosecond)
+            {
+                idx += inc;
+                money = atoi(recvbuf+idx);
+                if (money<=0 || money>my_money)
+                    er = "money wrong!";
+            }
+            else if (bet_type == BET_TYPE::number)
+            {
+                idx += inc;
+                number = atoi(recvbuf+idx);
+                idx += inc;
+                if (number >=0 && number < NO_VALUE)
+                    er = "number wrong!";
+                money = atoi(recvbuf+idx);
+                if (money<=0 || money>my_money)
+                    er += " money wrong!";
+            }
+            else
+            {
+                er = "wrong bet type!";
+            }
+            if (er == "")
+            {
+                m_game_mutex->lock();
+                if (m_game->isNoBets(m_socket))
+                {
+                    m_game->setBet(bet_type,number,money,m_socket);
+                }
+                else
+                {
+                    er = "can't bet more, than one";
+                }
+                m_game_mutex->unlock();
+            }
+            if (er != "")
+            {
+                strcpy(sendbuf+sendidx, "error");
+                sendidx += inc;
+                strcpy(sendbuf+sendidx, er.c_str());
                 int iResult = send( m_socket, sendbuf, sendbuflen, 0);
                 if (iResult == SOCKET_ERROR) {
                     wprintf(L"send failed with error: %d\n", WSAGetLastError());
