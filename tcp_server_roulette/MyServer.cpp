@@ -56,10 +56,10 @@ MyServer::~MyServer()
 void MyServer::start()
 {
     m_started = true;
-    m_accept_thread = shared_ptr<thread>( new thread(&MyServer::myAccept, this) );
-    m_comands_thread = shared_ptr<thread>( new thread(&MyServer::getCommands, this) );
-    m_comands_thread->join();
-    m_accept_thread->join();
+    m_acceptThread = shared_ptr<thread>( new thread(&MyServer::myAccept, this) );
+    m_comandsThread = shared_ptr<thread>( new thread(&MyServer::getCommands, this) );
+    m_comandsThread->join();
+    m_acceptThread->join();
 }
 
 void MyServer::myAccept()
@@ -74,8 +74,7 @@ void MyServer::myAccept()
         //int res = ioctlsocket(ac_sock, FIONBIO, &nb);
         //if (res != NO_ERROR)
         //    wprintf(L"ioctlsocket failed with error: %ld\n", res);
-        
-        this_thread::sleep_for(chrono::microseconds(1000));
+        //this_thread::sleep_for(chrono::microseconds(1000));
         
         cout << "accept now ...";
         ac_sock = accept(m_listen, NULL, NULL);
@@ -83,48 +82,34 @@ void MyServer::myAccept()
         if (ac_sock == INVALID_SOCKET) {
             wprintf(L"accept failed with error: %ld\n", WSAGetLastError());
             closesocket(m_listen);
+            m_started = false;
             //WSACleanup();
             break;
         } if (ac_sock == WSAEWOULDBLOCK) {
             continue;
         } else {
-            sockaddr_in ac_service;
-            int len = sizeof(ac_service);
-            if (getsockname(ac_sock, (SOCKADDR* ) &ac_service, &len)
-                    == SOCKET_ERROR) {
-                wprintf(L"getsocketname failed with error: %ld\n", WSAGetLastError());
-            }
-            sockaddr_in cl_service;
-            int cl_len = sizeof(cl_service);
-            if (getpeername(ac_sock, (SOCKADDR* ) &cl_service, &cl_len)
-                    == SOCKET_ERROR) {
-                wprintf(L"getsocketname failed with error: %ld\n", WSAGetLastError());
-            }
-            wprintf(L"Client connected:\n");
-            wprintf(L"  Client IP:PORT - %s:", inet_ntoa((in_addr) cl_service.sin_addr));
-            wprintf(L"%d\n", cl_service.sin_port);
-            wprintf(L"  Server create new socket for client, that IP:PORT - %s:", inet_ntoa((in_addr) ac_service.sin_addr));
-            wprintf(L"%d\n", ac_service.sin_port);
-            cout << "player id " << ac_sock << endl;
-            m_clients_mutex.lock();
-            m_clients.insert(make_pair(ac_sock, Player(ac_sock, &m_game, &m_game_mutex)));
-            m_clients.at(ac_sock).start();
-            m_clients_mutex.unlock();
+            printClientInfo(ac_sock);
+            m_clientsMutex.lock();
+            m_clients.insert(make_pair(ac_sock, shared_ptr<thread> ( new thread(&MyServer::exchange, this, ac_sock) )));
+            m_clientsMutex.unlock();
         }
     }
-    m_clients_mutex.lock();
+    delAndJoinAll();
+}
+
+void MyServer::delAndJoinAll() {
+    m_clientsMutex.lock();
     auto end = m_clients.end();
     for(auto i=m_clients.begin(); i != end; ++i)
     {
-        m_cout_mutex.lock();
         cout << "myAccept: client" << i->first << " stoping ... ";
-        m_cout_mutex.unlock();
         
-        i->second.stop();
+        m_clientsStartedMutex.lock();
+        m_clientsStarted.at(i->first) = false;
+        m_clientsStartedMutex.unlock();
         
-        m_cout_mutex.lock();
+        i->second->join();
         cout << "ok!" << endl;
-        m_cout_mutex.unlock();
         
         int iResult = shutdown(i->first, SD_SEND);
         if (iResult == SOCKET_ERROR) {
@@ -133,7 +118,29 @@ void MyServer::myAccept()
         }
         closesocket(i->first);
     }
-    m_clients_mutex.unlock();
+    m_clients.clear();
+    m_clientsMutex.unlock();
+}
+
+void MyServer::printClientInfo(SOCKET ac_sock) {
+    sockaddr_in ac_service;
+    int len = sizeof(ac_service);
+    if (getsockname(ac_sock, (SOCKADDR* ) &ac_service, &len)
+            == SOCKET_ERROR) {
+        wprintf(L"getsocketname failed with error: %ld\n", WSAGetLastError());
+    }
+    sockaddr_in cl_service;
+    int cl_len = sizeof(cl_service);
+    if (getpeername(ac_sock, (SOCKADDR* ) &cl_service, &cl_len)
+            == SOCKET_ERROR) {
+        wprintf(L"getsocketname failed with error: %ld\n", WSAGetLastError());
+    }
+    wprintf(L"Client connected:\n");
+    wprintf(L"  Client IP:PORT - %s:", inet_ntoa((in_addr) cl_service.sin_addr));
+    wprintf(L"%d\n", cl_service.sin_port);
+    wprintf(L"  Server create new socket for client, that IP:PORT - %s:", inet_ntoa((in_addr) ac_service.sin_addr));
+    wprintf(L"%d\n", ac_service.sin_port);
+    cout << "player id " << ac_sock << endl;
 }
 
 void MyServer::getCommands()
@@ -148,25 +155,82 @@ void MyServer::getCommands()
         if (s.substr(0,4) == "kill")
         {
             int a = atoi(s.substr(4,6).c_str());
-            m_clients_mutex.lock();
+            m_clientsMutex.lock();
             auto it = m_clients.find(a);
             if (it != m_clients.end())
             {
-                m_game_mutex.lock();
-                m_game.delPlayer(a);
-                m_game_mutex.unlock();
-                m_clients.at(a).stop();
+                m_clientsStartedMutex.lock();
+                m_clientsStarted.at(a) = false;
+                m_clientsStartedMutex.unlock();
+                it->second->join();
+                m_clients.erase(it);
             }
             else
             {
                 cout << "bad command" << endl;
             }
-            m_clients_mutex.unlock();
+            m_clientsMutex.unlock();
         }
         else if (s == "stop")
         {
             m_started = false;
             closesocket(m_listen);
         }
+    }
+}
+
+void MyServer::exchange(SOCKET sock)
+{
+    m_clientsStartedMutex.lock();
+    bool exch_started = m_clientsStarted.at(sock);
+    m_clientsStartedMutex.unlock();
+    
+    int recv_buf_len = m_proto.sendClientBufLen;
+    char recv_buf[recv_buf_len+1] = "";
+    
+    int send_buf_len = m_proto.sendServerBufLen;
+    char send_buf[send_buf_len+1] = "";
+    
+    bool is_exit = false;
+    
+    while (!is_exit)
+    {
+	int iResult = readn(sock, recv_buf, recv_buf_len);
+        if ( iResult > 0 ) {
+            wprintf(L"%s\n",recv_buf);
+            wprintf(L"Bytes received: %d\n", iResult);
+        }
+        else if ( iResult == 0 ) {
+            wprintf(L"Connection closed\n");
+            m_started = false;
+        }
+        else {
+            wprintf(L"recv failed: %d\n", WSAGetLastError());
+            m_started = false;
+        }
+        
+        m_clientsStartedMutex.lock();
+        exch_started = m_clientsStarted.at(sock);
+        m_clientsStartedMutex.unlock();
+        
+//        string send_command;
+//        if (exch_started == 0) {    // если сервер остановил
+//            send_command = "stop";
+//            is_exit = true;
+//        }
+//	else {
+//            string command;
+//            Player player_param;
+//            string pass;
+//            m_proto.convert(recv_buf, recv_buf_len, command, player_param, pass);
+//            if (command == "stop") {    // если клиент остановил
+//                // TODO
+//                break;
+//            }
+//            send_command = analize(const command, player_param, pass) 
+//            {isClStop?delClient,m_game->delPlayer/m_game.step(SOCKET)}
+//        }
+//        send_buf = m_proto.convert(send_command)
+//	send(isError?error:isUpdate?info,m_update=false:ok);
     }
 }

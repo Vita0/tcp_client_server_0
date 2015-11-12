@@ -1,0 +1,30 @@
+client		server
+connect()
+	<-------info
+update()
+ok	-------> (0.1 sec)
+	<-------ok
+ok	------->
+	...
+	<--X---ok (1 sec)	=>	close connection
+ok	---X-->	  (1 sec)	=>	close connection
+
+
+exit...
+bet
+enter_p
+enter_c -->
+	<-----info/error
+update()
+
+//////////////////////
+while(m_started)
+	readn()
+	isStop?stop:
+		command = stop
+	else
+		m_proto.convert(const char* recv_buf, &command, &player_param)
+	send_command = analize(const command, player_param) {isClStop?delClient,m_game->delPlayer/m_game.step(SOCKET)}
+	send_buf = m_proto.convert(send_command)
+	send(isError?error:isUpdate?info,m_update=false:ok)
+	
