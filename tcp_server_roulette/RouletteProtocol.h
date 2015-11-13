@@ -22,8 +22,8 @@ public:
     const int headerLen;
     
     Protocol()
-    :sendServerBufLen(100)
-    ,sendClientBufLen(20)
+    :sendServerBufLen(321)
+    ,sendClientBufLen(100)
     ,headerLen(10)
     {}
     
@@ -68,16 +68,37 @@ public:
     }
     
     string convert(const string &command, const SOCKET sock,
-                   const map<SOCKET, Player> &pls, const SOCKET croupier, const string &error)
+                   const map<SOCKET, Player> &pls, const SOCKET croupier,
+                   const string &error)
     {
         if (command == "ok" || command == "stop") {
             return command;
         }
         else if (command == "info") {
-            string res;
             char buf[sendServerBufLen + 1];
-            //TODO ...
-            //sprintf(buf, "%s ")
+            int idx = 0;
+            string s = "info      ";
+            sprintf(buf, "%s %d %d ", s.c_str(), sock, croupier);
+            idx += strlen(buf+idx);
+            
+            auto it = pls.begin();
+            for(int i = 0; i != MAX_PLAYER_COUNT; ++i)
+            {
+                char *from = buf+idx;
+                if (it != pls.end()) {
+                    sprintf(from, "%d %s %d %d %d %d %d", 
+                            it->first, it->second.bet.betValue.c_str(), it->second.bet.number,
+                            it->second.bet.money, it->second.last_bet,
+                            it->second.last_win, it->second.money);
+                    ++it;
+                }
+                else {
+                    sprintf(from, "%d %s %d %d %d %d %d",
+                            0, BET_TYPE::no_bet.c_str(), 0, 0, 0, 0, 0);
+                }
+                idx += strlen(buf+idx);
+            }
+            string res = buf;
             return res;
         }
         else if (command == "error") {

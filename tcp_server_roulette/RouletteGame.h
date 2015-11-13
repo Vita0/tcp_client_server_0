@@ -13,6 +13,7 @@
 
 using namespace std;
 
+const short MAX_PLAYER_COUNT = 4;
 const short NO_VALUE = 37;
 
 namespace BET_TYPE
@@ -64,7 +65,7 @@ private:
 
     map<SOCKET,Player> m_players;
 public:
-    Game() :m_maxPlayers(4)
+    Game() :m_maxPlayers(MAX_PLAYER_COUNT)
            ,m_croupier(0)
            ,m_croupierPassword("password")
            ,m_rouletteValue(NO_VALUE)
