@@ -15,17 +15,6 @@ using namespace std;
  * 
  */
 int main(int argc, char** argv) {
-//    vector<int> a = { 0, 10, 20, 30, 40 };
-//    for (auto it=a.begin(); it != a.end(); ++it)
-//    {
-//        if (*it == 30)
-//        {
-//            a.erase(it);
-//            break;
-//        }
-//    }
-//    for (int i = 0; i<a.size(); ++i)
-//        cout << i<< " " << a.at(i) << endl;
     try
     {
 	MyClient client("127.0.0.1", 27015);

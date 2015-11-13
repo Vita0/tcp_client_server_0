@@ -15,6 +15,7 @@ using namespace std;
 
 const short MAX_PLAYER_COUNT = 4;
 const short NO_VALUE = 37;
+const string NO_VALUE_str = "37";
 
 namespace BET_TYPE
 {
@@ -53,6 +54,12 @@ struct Player
     int last_bet;
     int last_win;
     Bet bet;
+    Player()
+            :money(0)
+            ,last_bet(0)
+            ,last_win(0)
+            ,bet(Bet())
+    {}
 };
 
 class Game
@@ -71,6 +78,10 @@ public:
            ,m_rouletteValue(NO_VALUE)
     {};
     virtual ~Game(){};
+    
+    short getValue() {
+        return m_rouletteValue;
+    }
     
     map<SOCKET,Player> getPlayers() {
         return m_players;

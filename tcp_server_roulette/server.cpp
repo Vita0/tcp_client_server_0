@@ -58,7 +58,7 @@ void tests()
     
     //server send
     
-    Bet bet(BET_TYPE::number, 1947483647, 2047483647);
+    Bet bet(BET_TYPE::number, 2047483647, 2147483647);
     Player pl;
     pl.bet = bet;
     pl.last_bet = 1047483647;
@@ -71,7 +71,7 @@ void tests()
     pls.insert(make_pair(1447483647, pl));
     pls.insert(make_pair(1547483647, pl));
     pls.insert(make_pair(1647483647, pl));
-    res = p.convert("info", 1747483647, pls, 1847483647, "some_error");
+    res = p.convert("info", 1747483647, 1847483647, 1947483647, pls,  "some_error");
     cout << "res len: " << res.length() << endl;;
     cout << res << "!!!" << endl;
     

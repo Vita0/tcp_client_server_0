@@ -12,7 +12,7 @@
 #include "RouletteGame.h"
 #include <string.h>
 
-int readn(SOCKET fd, char *data, size_t data_len);
+//int readn(SOCKET fd, char *data, size_t data_len);
 
 class Protocol
 {
@@ -22,7 +22,7 @@ public:
     const int headerLen;
     
     Protocol()
-    :sendServerBufLen(321)
+    :sendServerBufLen(400)
     ,sendClientBufLen(100)
     ,headerLen(10)
     {}
@@ -67,9 +67,9 @@ public:
         
     }
     
-    string convert(const string &command, const SOCKET sock,
-                   const map<SOCKET, Player> &pls, const SOCKET croupier,
-                   const string &error)
+    string convert(const string &command, const int val,
+                   const SOCKET sock, const SOCKET croupier,
+                   const map<SOCKET, Player> &pls, const string &error)
     {
         if (command == "ok" || command == "stop") {
             return command;
@@ -78,7 +78,7 @@ public:
             char buf[sendServerBufLen + 1];
             int idx = 0;
             string s = "info      ";
-            sprintf(buf, "%s %d %d ", s.c_str(), sock, croupier);
+            sprintf(buf, "%s %d %d %d ", s.c_str(), val, sock, croupier);
             idx += strlen(buf+idx);
             
             auto it = pls.begin();

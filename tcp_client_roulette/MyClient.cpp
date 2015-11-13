@@ -1,11 +1,7 @@
 #include "MyClient.h"
 #include <cstring>
-//#include <cstdio>
 #include <stdio.h>
 #include <string>
-
-const string NO_VALUE = "37";
-const short NO_VALUE_SHORT = 37;
 
 int readn(SOCKET fd, char *data, size_t data_len)
 {
@@ -32,21 +28,21 @@ int readn(SOCKET fd, char *data, size_t data_len)
 
 MyClient::MyClient(const char *server_ip, u_short server_port)
     :m_started(false)
-    ,m_players_count(4)
+    ,m_players_count(MAX_PLAYER_COUNT)
     ,m_number("")
     ,m_croupier("")
-    ,m_roulette_value("")
+    ,m_rouletteValue(NO_VALUE_str)
     ,m_commandInfo("")
 {
-    m_pls.resize(m_players_count);
-    for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
+    m_players.resize(m_players_count);
+    for(auto i=m_players.begin(); i!=m_players.end(); ++i)
     {
-        i->socket = 0; i->money = 0; i->last_bet = 0; i->last_win = 0;
+        i->first = 0; i->second = Player();
     }
     for(int i = 0; i < 3; ++i)
     {
-        m_server_errors.push_back("");
-        m_client_errors.push_back("");
+        m_serverErrors.push_back("");
+        m_clientErrors.push_back("");
     }
     
     WSADATA wsaData;
@@ -103,14 +99,15 @@ MyClient::~MyClient()
 void MyClient::start()
 {
     m_started = true;
-    m_recv_thread = shared_ptr<thread>( new thread(&MyClient::myRecv, this) );
-    m_send_thread = shared_ptr<thread>( new thread(&MyClient::mySend, this) );
-    m_send_thread->join();
-    m_recv_thread->join();
+    m_exchangeThread = shared_ptr<thread>( new thread(&MyClient::exchange, this) );
+    m_getCommandThread = shared_ptr<thread>( new thread(&MyClient::getCommand, this) );
+    m_getCommandThread->join();
+    m_exchangeThread->join();
 }
 
-void MyClient::mySend()
+void MyClient::getCommand()
 {
+    Protocol p;
     while (m_started)
     {
         m_commandInfo = "enter command:";
@@ -118,127 +115,39 @@ void MyClient::mySend()
         string s = "";
         cin >> s;
         if (!m_started) break;
-        const int sendbuflen = 70;
+
+    }
+}
+
+void MyClient::exchange()
+{
+    Protocol p;
+    while (m_started)
+    {
+        const int sendbuflen = p.sendClientBufLen;
         char sendbuf[sendbuflen+1];
-        const int inc = 10;
-        int idx = 0;
         
-        if (s == "enter_p")
-        {
-            idx = 0;
-            strcpy(sendbuf+idx, s.c_str());
-            int money = 0;
-            m_commandInfo = "enter MONEY:";
-            updateScreen();
-            cin >> money;
-            if (money <= 0)
-            {
-                addError(m_client_errors, "wrong money!");
-                continue;
-            }
-            idx += inc;
-            sprintf(sendbuf+idx, "%d", money);
+        if (m_command == "") {
+            strcpy(sendbuf, "ok");
+            this_thread::sleep_for(chrono::milliseconds(10));
+            cout << "ok" << endl;
         }
-        else if (s == "enter_c")
-        {
-            idx = 0;
-            strcpy(sendbuf+idx, s.c_str());
-            string pass;
-            m_commandInfo = "enter PASSWORD:";
-            updateScreen();
-            cin >> pass;
-            idx += inc;
-            sprintf(sendbuf+idx, "%s", pass.c_str());
+        else {
+            //TODO
         }
-        else if (s == "bet")
-        {
-            idx = 0;
-            strcpy(sendbuf+idx, s.c_str());
-            m_commandInfo = "enter BET TYPE:";
-            updateScreen();
-            cin >> s;
-            if (s == "even" || s == "odd" || s == "1/2" || s == "2/2")
-            {
-                idx += inc;
-                strcpy(sendbuf+idx, s.c_str());
-                int money;
-                m_commandInfo = "enter BET MONEY:";
-                updateScreen();
-                cin >> money;
-                if (money>0)
-                {
-                    idx += inc;
-                    sprintf(sendbuf+idx, "%d\0", money);
-                }
-                else
-                {
-                    addError(m_client_errors, "wrong money!");
-                    continue;
-                }
-            }
-            else if (s == "number")
-            {
-                idx += inc;
-                strcpy(sendbuf+idx, s.c_str());
-                m_commandInfo = "enter BET NUMBER:";
-                updateScreen();
-                short number;
-                cin >> number;
-                if (number>0 && number<NO_VALUE_SHORT)
-                {
-                    idx += inc;
-                    sprintf(sendbuf+idx, "%d\0", number);
-                    m_commandInfo = "enter BET MONEY:";
-                    updateScreen();
-                    int money;
-                    cin >> money;
-                    if (money>0)
-                    {
-                        idx += inc;
-                        sprintf(sendbuf+idx, "%d\0", money);
-                    }
-                    else
-                    {
-                        addError(m_client_errors, "wrong money!");
-                        continue;
-                    }
-                }
-                else
-                {
-                    addError(m_client_errors, "wrong number!");
-                    continue;
-                }
-            }
-            else
-            {
-                addError(m_client_errors, "wrong bet!");
-                continue;
-            }
-            
-            
-        }
-        else 
-        {
-            addError(m_client_errors, "wrong command!");
-            continue;
-        }
+        //TODO
+
         int iResult = send( m_socket, sendbuf, sendbuflen, 0);
         if (iResult == SOCKET_ERROR) {
             wprintf(L"send failed with error: %d\n", WSAGetLastError());
             closesocket(m_socket);
             throw 6;
         }
-    }
-}
-
-void MyClient::myRecv()
-{
-    while (m_started)
-    {
-        updateScreen();
-        const int recvbuflen = 380;
+        
+        
+        const int recvbuflen = p.sendServerBufLen;
         char recvbuf[recvbuflen+1];
-        int iResult = readn(m_socket, recvbuf, recvbuflen);
+        iResult = readn(m_socket, recvbuf, recvbuflen);
         if ( iResult > 0 ) {
             wprintf(L"%s\n",recvbuf);
             wprintf(L"Bytes received: %d\n", iResult);
@@ -251,66 +160,6 @@ void MyClient::myRecv()
             wprintf(L"recv failed: %d\n", WSAGetLastError());
             m_started = false;
         }
-
-        const int buflen = 10;
-        char buf[buflen+1];
-        const int inc = 10;
-        int idx = 0;
-        
-        if (strcmp(recvbuf+idx, "info") == 0)
-        {
-            idx += inc;
-            m_number = recvbuf+idx;
-            idx += inc;
-            m_roulette_value = recvbuf+idx;
-            idx += inc;
-            if (strcmp(recvbuf+idx, "croupier") != 0)
-                addError(m_client_errors, "protocol error: info - field croupier not found");
-            idx += inc;
-            m_croupier = recvbuf+idx;
-            for(GamePlayer &i: m_pls)
-            {
-                idx += inc;
-                if (strcmp(recvbuf+idx, "player") != 0)
-                    addError(m_client_errors, "protocol error: info - field player not found");
-                idx += inc;
-                i.socket = atoi(recvbuf+idx);
-                idx += inc;
-                i.money = atoi(recvbuf+idx);
-                idx += inc;
-                i.last_bet = atoi(recvbuf+idx);
-                idx += inc;
-                i.last_win = atoi(recvbuf+idx);
-                idx += inc;
-                i.bet.betValue = recvbuf+idx;
-                idx += inc;
-                i.bet.number = atoi(recvbuf+idx);
-                idx += inc;
-                i.bet.money = atoi(recvbuf+idx);
-            }
-            cout << "recv, idx = " << idx << endl;
-        }
-        else if (strcmp(recvbuf+idx,"error") == 0)
-        {
-            idx += inc;
-            string er = recvbuf+idx;
-            addError(m_server_errors, er);
-        }
-        else if (strcmp(recvbuf+idx,"stop") == 0)
-        {
-            cout << "server say 'stop'" << endl;
-            m_started = false;
-            const int sendbuflen = 70;
-            char sendbuf[sendbuflen+1];
-            strcpy(sendbuf,"bye");
-            int iResult = send( m_socket, sendbuf, sendbuflen, 0);
-            if (iResult == SOCKET_ERROR) {
-                wprintf(L"send failed with error: %d\n", WSAGetLastError());
-                closesocket(m_socket);
-                throw 6;
-            }
-            break;
-        }
     }
 }
 
@@ -318,20 +167,21 @@ void MyClient::updateScreen()
 {
     cout << "\033[2J\033[1;1H"; //clear screen
     string croupier = (m_croupier=="0")?"waiting croupier":m_croupier;
-    string roulette_value = (m_roulette_value==NO_VALUE)?"was now games yet":m_roulette_value;
-    cout << "            info:" << endl;
-    cout << "                    croupier: " << croupier << "     you number: " << m_number << endl << endl;
-    cout << "                             last roulette value: " << roulette_value << endl;
-    cout << "                     <player>      <money>   <bet>  <number>  <money>    <last bet>  <last win> " << endl;
-    for(auto i=m_pls.begin(); i!=m_pls.end(); ++i)
-    cout << "                    " << i->socket << "\t\t" << i->money << "\t\t" << i->bet.betValue 
-                                    << "\t\t" << i->bet.number << "\t\t" << i->bet.money 
-                                    << "\t\t" << i->last_bet << "\t\t" << i->last_win << endl;
+    string roulette_value = (m_rouletteValue==NO_VALUE_str)?"was now games yet":m_rouletteValue;
+    cout << "info:" << endl;
+    cout << "             croupier: " << croupier << "     you number: " << m_number << endl << endl;
+    cout << "                  last roulette value: " << roulette_value << endl;
+    cout << "        <player>   <bet>   <number>  <money> <last bet>  <last win> <money>   " << endl;
+    for(auto i=m_players.begin(); i!=m_players.end(); ++i)
+    cout << "                    " << i->first << "\t" << i->second.bet.betValue 
+                                    << "\t" << i->second.bet.number << "\t" << i->second.bet.money 
+                                    << "\t" << i->second.last_bet << "\t" << i->second.last_win 
+                                    << "\t" << i->second.money << endl;
     cout << " last (s) errors:" << endl;
-    for(auto error = m_server_errors.begin(); error != m_server_errors.end(); ++error)
+    for(auto error = m_serverErrors.begin(); error != m_serverErrors.end(); ++error)
     cout << "                 " << *error << endl;
     cout << " last (c) errors:" << endl;
-    for(auto error = m_client_errors.begin(); error != m_client_errors.end(); ++error)
+    for(auto error = m_clientErrors.begin(); error != m_clientErrors.end(); ++error)
     cout << "                 " << *error << endl;
     cout << "    command info:" << m_commandInfo << endl;
 }

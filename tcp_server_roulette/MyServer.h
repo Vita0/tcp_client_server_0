@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 
-#include "RouletteGame.h"
 #include "RouletteProtocol.h"
 
 using namespace std;

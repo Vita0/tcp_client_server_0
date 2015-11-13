@@ -15,21 +15,10 @@
 #include <iostream>
 #include <deque>
 #include <vector>
+#include "../tcp_server_roulette/RouletteGame.h"
+#include "../tcp_server_roulette/RouletteProtocol.h"
 
 using namespace std;
-
-namespace BET_TYPE
-{
-    const string onesecond = "1/2";
-    const string twosecond = "2/2";
-    const string even = "even";
-    const string odd = "odd";
-    const string number = "number";
-    const string no_bet = "no bet";
-//    const string onethird = "1/3";
-//    const string twothird = "2/3";
-//    const string treethird = "3/3";
-}
 
 class MyClient
 {
@@ -38,42 +27,25 @@ private:
     bool m_started;
     const int m_players_count;
     
-    shared_ptr<thread> m_recv_thread;
-    shared_ptr<thread> m_send_thread;
+    shared_ptr<thread> m_exchangeThread;
+    shared_ptr<thread> m_getCommandThread;
     
-    struct Bet
-    {
-        Bet()
-           :betValue(BET_TYPE::no_bet)
-           ,number(" ")
-           ,money(" ")
-        {}
-        string betValue;
-        string number;
-        string money;
-    };
-    struct GamePlayer
-    {
-        int socket;
-        int money;
-        int last_bet;
-        int last_win;
-        Bet bet;
-    };
+    string m_command;
+    
     //screen
     string m_number;
     string m_croupier;
-    string m_roulette_value;
+    string m_rouletteValue;
     string m_commandInfo;
-    vector<GamePlayer> m_pls;
-    deque<string> m_server_errors;
-    deque<string> m_client_errors;
+    vector< pair<SOCKET, Player> > m_players;
+    deque<string> m_serverErrors;
+    deque<string> m_clientErrors;
 public:
     MyClient(const char *server_ip, u_short server_port);
     ~MyClient();
     void start();
-    void mySend();
-    void myRecv();
+    void getCommand();
+    void exchange();
     void updateScreen();
     void addError(deque<string> &deq, const string &s);
 };

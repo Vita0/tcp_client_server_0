@@ -3,6 +3,29 @@
 
 #include "MyServer.h"
 
+int readn(SOCKET fd, char *data, size_t data_len)
+{
+    int cnt;
+    int res;
+    
+    cnt = data_len;
+    while( cnt > 0 ) {
+        res = recv(fd, data, cnt, 0);
+        if ( res < 0 )
+        {
+            if ( errno == EINTR )
+                continue;
+            wprintf(L"recv failed: %d\n", WSAGetLastError());
+            return -1;
+        }
+        if ( res == 0 )
+            return data_len - cnt;
+        data += res;
+        cnt -= res;
+    }
+    return data_len;
+}
+
 MyServer::MyServer(const char* ip, u_short port)
     :m_started(false)
 {
@@ -92,6 +115,9 @@ void MyServer::myAccept()
             m_clientsMutex.lock();
             m_clients.insert(make_pair(ac_sock, shared_ptr<thread> ( new thread(&MyServer::exchange, this, ac_sock) )));
             m_clientsMutex.unlock();
+            m_isClientsUpdateMutex.lock();
+            m_isClientsUpdate.insert(make_pair(ac_sock, true));
+            m_isClientsUpdateMutex.unlock();
         }
     }
     delAndJoinAll();
@@ -236,9 +262,10 @@ void MyServer::exchange(SOCKET sock)
         m_gameMutex.lock();
         map<SOCKET, Player> pls = m_game.getPlayers();
         SOCKET croupier = m_game.getCroupier();
+        int val = m_game.getValue();
         m_gameMutex.unlock();
         
-        strcpy(send_buf, m_proto.convert(send_command, sock, pls, croupier, error).c_str());
+        strcpy(send_buf, m_proto.convert(send_command, val, sock, croupier, pls, error).c_str());
         
         m_isClientsUpdateMutex.lock();
 	//send(isError?error:isUpdate?info,m_update=false:ok);
@@ -251,7 +278,12 @@ void MyServer::exchange(SOCKET sock)
 string MyServer::analize(const string& command, const Player& player_param, const string& pass, SOCKET sock, string &error)
 {
     if (command == "ok") {
-        return "ok";
+        m_isClientsUpdateMutex.lock();
+        bool upd = m_isClientsUpdate.at(sock);
+        m_isClientsUpdateMutex.unlock();
+        string res = upd ? "info" : "ok";
+        if (upd) updateAll();
+        return res;
     }
     else if (command == "stop") {
         m_gameMutex.lock();
