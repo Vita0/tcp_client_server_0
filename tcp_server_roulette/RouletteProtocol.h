@@ -36,7 +36,7 @@ public:
         // Server commands
         if (command == "stop") {
             return;
-        } 
+        }
         else if (command == "enter_p") {
             sscanf(recv_buf, "%d", &player_param.money);
         }
@@ -54,6 +54,9 @@ public:
                 sscanf(recv_buf, "%d %d", &player_param.bet.number, &player_param.bet.money );
             else
                 sscanf(recv_buf, "%d", &player_param.bet.money );
+        }
+        else if (command == "rotate") {
+            return;
         }
         
         // Client commands

@@ -213,24 +213,24 @@ void MyServer::exchange(SOCKET sock)
         exch_started = m_clientsStarted.at(sock);
         m_clientsStartedMutex.unlock();
         
-//        string send_command;
-//        if (exch_started == 0) {    // если сервер остановил
-//            send_command = "stop";
-//            is_exit = true;
-//        }
-//	else {
-//            string command;
-//            Player player_param;
-//            string pass;
-//            m_proto.convert(recv_buf, recv_buf_len, command, player_param, pass);
-//            if (command == "stop") {    // если клиент остановил
-//                // TODO
-//                break;
-//            }
-//            send_command = analize(const command, player_param, pass) 
-//            {isClStop?delClient,m_game->delPlayer/m_game.step(SOCKET)}
-//        }
-//        send_buf = m_proto.convert(send_command)
-//	send(isError?error:isUpdate?info,m_update=false:ok);
+        string send_command;
+        if (!exch_started) {    // если сервер остановил
+            send_command = "stop";
+            is_exit = true;
+        }
+	else {
+            string command;
+            Player player_param;
+            string pass;
+            m_proto.convert(recv_buf, recv_buf_len, command, player_param, pass);
+            if (command == "stop") {    // если клиент остановил
+                // TODO
+                break;
+            }
+            //send_command = analize(const command, player_param, pass) 
+            //{isClStop?delClient,m_game->delPlayer/m_game.step(SOCKET)}
+        }
+        //send_buf = m_proto.convert(send_command)
+	//send(isError?error:isUpdate?info,m_update=false:ok);
     }
 }

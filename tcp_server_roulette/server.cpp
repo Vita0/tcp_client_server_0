@@ -51,6 +51,11 @@ void tests()
     if ( command != "bet" || player_param.bet.betValue != "number" || player_param.bet.money != 500 || player_param.bet.number != 15)
         cout << "false 5" << endl;
     
+    strcpy(recv_buf,"rotate    ");
+    p.convert(recv_buf, recv_buf_len, command, player_param, pass);
+    if ( command != "rotate" )
+        cout << "false 6" << endl;
+    
     //client recive
     
     
