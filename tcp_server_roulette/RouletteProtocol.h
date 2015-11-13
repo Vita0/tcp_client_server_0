@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "RouletteGame.h"
+#include <string.h>
 
 int readn(SOCKET fd, char *data, size_t data_len);
 
@@ -37,6 +38,9 @@ public:
         if (command == "stop") {
             return;
         }
+        else if (command == "ok") {
+            return;
+        }
         else if (command == "enter_p") {
             sscanf(recv_buf, "%d", &player_param.money);
         }
@@ -61,6 +65,24 @@ public:
         
         // Client commands
         
+    }
+    
+    string convert(const string &command, const SOCKET sock,
+                   const map<SOCKET, Player> &pls, const SOCKET croupier, const string &error)
+    {
+        if (command == "ok" || command == "stop") {
+            return command;
+        }
+        else if (command == "info") {
+            string res;
+            char buf[sendServerBufLen + 1];
+            //TODO ...
+            //sprintf(buf, "%s ")
+            return res;
+        }
+        else if (command == "error") {
+            return "error     " + error; 
+        }
     }
 };
 

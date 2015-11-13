@@ -70,10 +70,30 @@ public:
            ,m_rouletteValue(NO_VALUE)
     {};
     virtual ~Game(){};
-    //short getPlayersCount() { return m_players.size(); }
-    bool checkCroupierPassword(string s) { return s == m_croupierPassword; }
-    void addPlayer(SOCKET sock, int money)
+    
+    map<SOCKET,Player> getPlayers() {
+        return m_players;
+    }
+    
+    SOCKET getCroupier() {
+        return m_croupier;
+    }
+    
+    bool checkCroupierPassword(string s) {
+        return s == m_croupierPassword;
+    }
+    
+    void addPlayer(SOCKET sock, int money, string &error)
     {
+        if (m_players.find(sock) == m_players.end())
+        {
+            return;
+        }
+        if (m_players.size() == 4)
+        {
+            error += "max players are plaing now\n";
+            return;
+        }
         Player lol;
         lol.money = money;
         lol.last_bet = 0;
@@ -82,6 +102,18 @@ public:
         lol.bet = bet;
         m_players.insert(pair<SOCKET,Player>(sock, lol));
     }
+    
+    void addCroupier(SOCKET sock, string const &pass, string &error)
+    {
+        if (m_croupier != 0)
+            error += "croupier plase is busy\n";
+        else if ( !checkCroupierPassword(pass) )
+            error += "invalid password\n";
+        else
+            m_croupier = sock;
+        return;
+    }
+    
     void delPlayer(SOCKET sock)
     {
         if (sock == m_croupier) {
@@ -89,43 +121,58 @@ public:
         }
         m_players.erase(sock);
     }
-    bool isNoBets(SOCKET sock) {
-        return m_players.at(sock).bet.money > 0;
+    
+    bool isNoBets(const SOCKET sock) {
+        return m_players.at(sock).bet.betValue == BET_TYPE::no_bet;
     }
     
-    void setBet(string betValue, int number, int bet_money, SOCKET sock) {
-        m_players.at(sock).bet = Bet(betValue, number, bet_money);
-        m_players.at(sock).money -= bet_money;
+    void setBet(const Bet &bet, SOCKET sock, string &error) {
+        if (!isNoBets(sock)) {
+            error += "you can't do more then one bet\n";
+        }
+        else if (bet.money <= m_players.at(sock).money &&
+                (bet.number >=0 && bet.number < NO_VALUE || bet.betValue != BET_TYPE::number)) {
+            m_players.at(sock).bet = bet;
+            m_players.at(sock).money -= bet.money;
+        }
+        else {
+            error += "wrong bet\n";
+        }
         return;
     }
     
-    void doBet(short rouletteValue, SOCKET sock) {
-        auto it = m_players.find(sock);
-        if (it == m_players.end())
-            return;
+    void doBets() {
+        m_rouletteValue = 15; //TODO rand
+        bool odd = m_rouletteValue%2;
+        bool onesecond = m_rouletteValue<(NO_VALUE-1)/2;
         
-        bool odd = rouletteValue%2;
-        bool onesecond = rouletteValue<(NO_VALUE-1)/2;
-        bool number = rouletteValue == it->second.bet.number;
-        int koef=0;
-        if (it->second.bet.betValue == BET_TYPE::odd) {
-            if (odd) koef = 2; 
-        } else if (it->second.bet.betValue == BET_TYPE::even) {
-            if (!odd) koef = 2; 
-        } else if (it->second.bet.betValue == BET_TYPE::onesecond) {
-            if (onesecond) koef = 2; 
-        } else if (it->second.bet.betValue == BET_TYPE::twosecond) {
-            if (!onesecond) koef = 2; 
-        } else if (it->second.bet.betValue == BET_TYPE::twosecond) {
-            if (number) koef = 36;
+        for(auto it = m_players.begin(); it != m_players.end(); ++it)
+        {
+            bool number = m_rouletteValue == it->second.bet.number;
+            int koef=0;
+            
+            if (it->second.bet.betValue == BET_TYPE::odd) {
+                if (odd) koef = 2; 
+            }
+            else if (it->second.bet.betValue == BET_TYPE::even) {
+                if (!odd) koef = 2; 
+            }
+            else if (it->second.bet.betValue == BET_TYPE::onesecond) {
+                if (onesecond) koef = 2; 
+            }
+            else if (it->second.bet.betValue == BET_TYPE::twosecond) {
+                if (!onesecond) koef = 2; 
+            }
+            else if (it->second.bet.betValue == BET_TYPE::twosecond) {
+                if (number) koef = 36;
+            }
+
+            int win = koef * it->second.money;
+            it->second.money += win;
+            it->second.last_bet = it->second.bet.money;
+            it->second.last_win = win;
+            it->second.bet = Bet();
         }
-        
-        m_rouletteValue = rouletteValue;
-        int win = koef * it->second.money;
-        it->second.money += win;
-        it->second.last_bet = it->second.bet.money;
-        it->second.last_win = win;
-        it->second.bet = Bet();
     }
 };
 

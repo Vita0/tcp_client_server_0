@@ -104,9 +104,9 @@ void MyServer::delAndJoinAll() {
     {
         cout << "myAccept: client" << i->first << " stoping ... ";
         
-        m_clientsStartedMutex.lock();
-        m_clientsStarted.at(i->first) = false;
-        m_clientsStartedMutex.unlock();
+        m_isClientsStartedMutex.lock();
+        m_isClientsStarted.at(i->first) = false;
+        m_isClientsStartedMutex.unlock();
         
         i->second->join();
         cout << "ok!" << endl;
@@ -155,21 +155,7 @@ void MyServer::getCommands()
         if (s.substr(0,4) == "kill")
         {
             int a = atoi(s.substr(4,6).c_str());
-            m_clientsMutex.lock();
-            auto it = m_clients.find(a);
-            if (it != m_clients.end())
-            {
-                m_clientsStartedMutex.lock();
-                m_clientsStarted.at(a) = false;
-                m_clientsStartedMutex.unlock();
-                it->second->join();
-                m_clients.erase(it);
-            }
-            else
-            {
-                cout << "bad command" << endl;
-            }
-            m_clientsMutex.unlock();
+            delAndJoin(a);
         }
         else if (s == "stop")
         {
@@ -179,11 +165,30 @@ void MyServer::getCommands()
     }
 }
 
+void MyServer::delAndJoin(SOCKET sock)
+{
+    m_clientsMutex.lock();
+    auto it = m_clients.find(sock);
+    if (it != m_clients.end())
+    {
+        m_isClientsStartedMutex.lock();
+        m_isClientsStarted.at(sock) = false;
+        m_isClientsStartedMutex.unlock();
+        it->second->join();
+        m_clients.erase(it);
+    }
+    else
+    {
+        cout << "delAndJoin(): bad socket" << endl;
+    }
+    m_clientsMutex.unlock();
+}
+
 void MyServer::exchange(SOCKET sock)
 {
-    m_clientsStartedMutex.lock();
-    bool exch_started = m_clientsStarted.at(sock);
-    m_clientsStartedMutex.unlock();
+    m_isClientsStartedMutex.lock();
+    bool exch_started = m_isClientsStarted.at(sock);
+    m_isClientsStartedMutex.unlock();
     
     int recv_buf_len = m_proto.sendClientBufLen;
     char recv_buf[recv_buf_len+1] = "";
@@ -191,9 +196,9 @@ void MyServer::exchange(SOCKET sock)
     int send_buf_len = m_proto.sendServerBufLen;
     char send_buf[send_buf_len+1] = "";
     
-    bool is_exit = false;
+    //bool is_exit = false;
     
-    while (!is_exit)
+    while (!m_started)
     {
 	int iResult = readn(sock, recv_buf, recv_buf_len);
         if ( iResult > 0 ) {
@@ -209,28 +214,94 @@ void MyServer::exchange(SOCKET sock)
             m_started = false;
         }
         
-        m_clientsStartedMutex.lock();
-        exch_started = m_clientsStarted.at(sock);
-        m_clientsStartedMutex.unlock();
+        m_isClientsStartedMutex.lock();
+        exch_started = m_isClientsStarted.at(sock);
+        m_isClientsStartedMutex.unlock();
         
         string send_command;
+        string error;
         if (!exch_started) {    // если сервер остановил
             send_command = "stop";
-            is_exit = true;
+            m_started = false;
         }
 	else {
             string command;
             Player player_param;
             string pass;
+            
             m_proto.convert(recv_buf, recv_buf_len, command, player_param, pass);
-            if (command == "stop") {    // если клиент остановил
-                // TODO
-                break;
-            }
-            //send_command = analize(const command, player_param, pass) 
-            //{isClStop?delClient,m_game->delPlayer/m_game.step(SOCKET)}
+            send_command = analize(command, player_param, pass, sock, error);
         }
-        //send_buf = m_proto.convert(send_command)
+        
+        m_gameMutex.lock();
+        map<SOCKET, Player> pls = m_game.getPlayers();
+        SOCKET croupier = m_game.getCroupier();
+        m_gameMutex.unlock();
+        
+        strcpy(send_buf, m_proto.convert(send_command, sock, pls, croupier, error).c_str());
+        
+        m_isClientsUpdateMutex.lock();
 	//send(isError?error:isUpdate?info,m_update=false:ok);
+        if (send_command == "info" || send_command == "stop")
+            m_isClientsUpdate.at(sock) = false;
+        m_isClientsUpdateMutex.unlock();
     }
+}
+
+string MyServer::analize(const string& command, const Player& player_param, const string& pass, SOCKET sock, string &error)
+{
+    if (command == "ok") {
+        return "ok";
+    }
+    else if (command == "stop") {
+        m_gameMutex.lock();
+        m_game.delPlayer(sock);
+        m_gameMutex.unlock();
+        delAndJoin(sock);
+        updateAll();
+    }
+    else if (command == "enter_p") {
+        m_gameMutex.lock();
+        m_game.addPlayer(sock, player_param.money, error);
+        m_gameMutex.unlock();
+        updateAll();
+    }
+    else if (command == "enter_c") {
+        m_gameMutex.lock();
+        m_game.addCroupier(sock, pass, error);
+        m_gameMutex.unlock();
+        updateAll();
+    }
+    else if (command == "bet") {
+        m_gameMutex.lock();
+        m_game.setBet(player_param.bet, sock, error);
+        m_gameMutex.unlock();
+        updateAll();
+    }
+    else if (command == "rotate") {
+        m_gameMutex.lock();
+        m_game.doBets();
+        m_gameMutex.unlock();
+        updateAll();
+    }
+    else {
+        error += "wrong command type\n";
+    }
+    
+    if (error != "") {
+        return "error";
+    }
+    else {
+        return "info";
+    }
+}
+
+void MyServer::updateAll()
+{
+    m_isClientsUpdateMutex.lock();
+    for(auto i=m_isClientsUpdate.begin(); i != m_isClientsUpdate.end(); ++i)
+    {
+        i->second = true;
+    }
+    m_isClientsUpdateMutex.unlock();
 }
