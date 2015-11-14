@@ -12,6 +12,7 @@
 #include "RouletteGame.h"
 #include <string.h>
 
+using namespace std;
 //int readn(SOCKET fd, char *data, size_t data_len);
 
 class Protocol
@@ -31,7 +32,7 @@ public:
     {
         char buf[headerLen + 1];
         sscanf(recv_buf, "%s", buf);
-        recv_buf += headerLen;
+        recv_buf += strlen(buf)+1;//headerLen;
         command = buf;
         
         // Server commands
@@ -53,7 +54,8 @@ public:
             char bet_val[BET_TYPE::max_string_len + 1];
             sscanf(recv_buf, "%s", bet_val);
             player_param.bet.betValue = bet_val;
-            recv_buf += (strlen(bet_val));
+            recv_buf += strlen(bet_val);
+            
             if (bet_val == BET_TYPE::number)
                 sscanf(recv_buf, "%d %d", &player_param.bet.number, &player_param.bet.money );
             else
@@ -86,15 +88,15 @@ public:
             {
                 char *from = buf+idx;
                 if (it != pls.end()) {
-                    sprintf(from, "%d %s %d %d %d %d %d", 
+                    sprintf(from, "%d %s %d %d %d %d %d ", 
                             it->first, it->second.bet.betValue.c_str(), it->second.bet.number,
                             it->second.bet.money, it->second.last_bet,
                             it->second.last_win, it->second.money);
                     ++it;
                 }
                 else {
-                    sprintf(from, "%d %s %d %d %d %d %d",
-                            0, BET_TYPE::no_bet.c_str(), 0, 0, 0, 0, 0);
+                    sprintf(from, "%d %s %d %d %d %d %d ",
+                            0, BET_TYPE::no_bet.c_str(), NO_VALUE, 0, 0, 0, 0);
                 }
                 idx += strlen(buf+idx);
             }

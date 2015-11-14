@@ -25,7 +25,7 @@ namespace BET_TYPE
     const string even = "even";
     const string odd = "odd";
     const string number = "number";
-    const string no_bet = "no bet";
+    const string no_bet = "no_bet";
 //    const string onethird = "1/3";
 //    const string twothird = "2/3";
 //    const string treethird = "3/3";
@@ -97,13 +97,18 @@ public:
     
     void addPlayer(SOCKET sock, int money, string &error)
     {
-        if (m_players.find(sock) == m_players.end())
+        if (m_players.find(sock) != m_players.end())
         {
             return;
         }
         if (m_players.size() == 4)
         {
             error += "max players are plaing now\n";
+            return;
+        }
+        if (money <= 0 || money > 10000)
+        {
+            error += "invalid money";
             return;
         }
         Player lol;
@@ -175,11 +180,11 @@ public:
             else if (it->second.bet.betValue == BET_TYPE::twosecond) {
                 if (!onesecond) koef = 2; 
             }
-            else if (it->second.bet.betValue == BET_TYPE::twosecond) {
+            else if (it->second.bet.betValue == BET_TYPE::number) {
                 if (number) koef = 36;
             }
 
-            int win = koef * it->second.money;
+            int win = koef * it->second.bet.money;
             it->second.money += win;
             it->second.last_bet = it->second.bet.money;
             it->second.last_win = win;

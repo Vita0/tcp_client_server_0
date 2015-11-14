@@ -28,6 +28,7 @@ int readn(SOCKET fd, char *data, size_t data_len)
 
 MyServer::MyServer(const char* ip, u_short port)
     :m_started(false)
+    ,m_delStarted(true)
 {
     WSADATA wsaData;
 
@@ -81,6 +82,8 @@ void MyServer::start()
     m_started = true;
     m_acceptThread = shared_ptr<thread>( new thread(&MyServer::myAccept, this) );
     m_comandsThread = shared_ptr<thread>( new thread(&MyServer::getCommands, this) );
+    m_cleanThread = shared_ptr<thread>( new thread(&MyServer::delClients, this) );
+    m_cleanThread->join();
     m_comandsThread->join();
     m_acceptThread->join();
 }
@@ -112,40 +115,18 @@ void MyServer::myAccept()
             continue;
         } else {
             printClientInfo(ac_sock);
-            m_clientsMutex.lock();
-            m_clients.insert(make_pair(ac_sock, shared_ptr<thread> ( new thread(&MyServer::exchange, this, ac_sock) )));
-            m_clientsMutex.unlock();
+            m_isClientsStartedMutex.lock();
+            m_isClientsStarted.insert(make_pair(ac_sock, true));
+            m_isClientsStartedMutex.unlock();
             m_isClientsUpdateMutex.lock();
             m_isClientsUpdate.insert(make_pair(ac_sock, true));
             m_isClientsUpdateMutex.unlock();
+            m_clientsMutex.lock();
+            m_clients.insert(make_pair(ac_sock, shared_ptr<thread> ( new thread(&MyServer::exchange, this, ac_sock) )));
+            m_clientsMutex.unlock();
         }
     }
-    delAndJoinAll();
-}
-
-void MyServer::delAndJoinAll() {
-    m_clientsMutex.lock();
-    auto end = m_clients.end();
-    for(auto i=m_clients.begin(); i != end; ++i)
-    {
-        cout << "myAccept: client" << i->first << " stoping ... ";
-        
-        m_isClientsStartedMutex.lock();
-        m_isClientsStarted.at(i->first) = false;
-        m_isClientsStartedMutex.unlock();
-        
-        i->second->join();
-        cout << "ok!" << endl;
-        
-        int iResult = shutdown(i->first, SD_SEND);
-        if (iResult == SOCKET_ERROR) {
-            wprintf(L"shutdown failed: %d\n", WSAGetLastError());
-            closesocket(i->first);
-        }
-        closesocket(i->first);
-    }
-    m_clients.clear();
-    m_clientsMutex.unlock();
+    
 }
 
 void MyServer::printClientInfo(SOCKET ac_sock) {
@@ -161,12 +142,12 @@ void MyServer::printClientInfo(SOCKET ac_sock) {
             == SOCKET_ERROR) {
         wprintf(L"getsocketname failed with error: %ld\n", WSAGetLastError());
     }
-    wprintf(L"Client connected:\n");
-    wprintf(L"  Client IP:PORT - %s:", inet_ntoa((in_addr) cl_service.sin_addr));
-    wprintf(L"%d\n", cl_service.sin_port);
-    wprintf(L"  Server create new socket for client, that IP:PORT - %s:", inet_ntoa((in_addr) ac_service.sin_addr));
-    wprintf(L"%d\n", ac_service.sin_port);
-    cout << "player id " << ac_sock << endl;
+    //wprintf(L"Client connected:\n");
+    //wprintf(L"  Client IP:PORT - %s:", inet_ntoa((in_addr) cl_service.sin_addr));
+    //wprintf(L"%d\n", cl_service.sin_port);
+    //wprintf(L"  Server create new socket for client, that IP:PORT - %s:", inet_ntoa((in_addr) ac_service.sin_addr));
+    //wprintf(L"%d\n", ac_service.sin_port);
+    cout << "player connected - id " << ac_sock << endl;
 }
 
 void MyServer::getCommands()
@@ -181,33 +162,57 @@ void MyServer::getCommands()
         if (s.substr(0,4) == "kill")
         {
             int a = atoi(s.substr(4,6).c_str());
-            delAndJoin(a);
+            preDelClient(a);
+            m_needToDel.push(a);
+            //delAndJoin(a);
         }
         else if (s == "stop")
         {
             m_started = false;
             closesocket(m_listen);
+            m_clientsMutex.lock();
+            for(auto it = m_clients.begin(); it != m_clients.end(); ++it)
+            {
+                preDelClient(it->first);
+                m_needToDel.push(it->first);
+            }
+            m_clientsMutex.unlock();
+            m_delStarted = false;
         }
     }
 }
 
 void MyServer::delAndJoin(SOCKET sock)
 {
-    m_clientsMutex.lock();
-    auto it = m_clients.find(sock);
-    if (it != m_clients.end())
-    {
-        m_isClientsStartedMutex.lock();
-        m_isClientsStarted.at(sock) = false;
-        m_isClientsStartedMutex.unlock();
-        it->second->join();
-        m_clients.erase(it);
-    }
-    else
-    {
-        cout << "delAndJoin(): bad socket" << endl;
-    }
-    m_clientsMutex.unlock();
+//    m_clientsMutex.lock();
+//    cout << "lock" << endl;
+//    auto it = m_clients.find(sock);
+//    if (it != m_clients.end())
+//    {
+//        m_isClientsStartedMutex.lock();
+//        cout << "lock" << endl;
+//        //m_isClientsStarted.at(sock) = false;
+//        m_isClientsStarted.erase(sock);
+//        cout << "erase" << endl;
+//        m_isClientsStartedMutex.unlock();
+//        cout << "unlock" << endl;
+//        m_isClientsUpdateMutex.lock();
+//        cout << "lock" << endl;
+//        m_isClientsUpdate.erase(sock);
+//        cout << "erase" << endl;
+//        m_isClientsUpdateMutex.unlock();
+//        cout << "unlock" << endl;
+//        it->second->join();
+//        cout << "join" << endl;
+//        m_clients.erase(it);
+//        cout << "erase" << endl;
+//    }
+//    else
+//    {
+//        cout << "delAndJoin(): bad socket" << endl;
+//    }
+//    m_clientsMutex.unlock();
+//    cout << "unlock" << endl;
 }
 
 void MyServer::exchange(SOCKET sock)
@@ -223,13 +228,12 @@ void MyServer::exchange(SOCKET sock)
     char send_buf[send_buf_len+1] = "";
     
     //bool is_exit = false;
-    
-    while (!m_started)
+    while (m_started)
     {
 	int iResult = readn(sock, recv_buf, recv_buf_len);
         if ( iResult > 0 ) {
-            wprintf(L"%s\n",recv_buf);
-            wprintf(L"Bytes received: %d\n", iResult);
+            //wprintf(L"%s!\n",recv_buf);
+            //wprintf(L"Bytes received: %d\n", iResult);
         }
         else if ( iResult == 0 ) {
             wprintf(L"Connection closed\n");
@@ -247,6 +251,7 @@ void MyServer::exchange(SOCKET sock)
         string send_command;
         string error;
         if (!exch_started) {    // если сервер остановил
+            cout << "!exch_started" << endl;
             send_command = "stop";
             m_started = false;
         }
@@ -257,6 +262,8 @@ void MyServer::exchange(SOCKET sock)
             
             m_proto.convert(recv_buf, recv_buf_len, command, player_param, pass);
             send_command = analize(command, player_param, pass, sock, error);
+            if (send_command == "stop from client")
+                break;
         }
         
         m_gameMutex.lock();
@@ -268,11 +275,21 @@ void MyServer::exchange(SOCKET sock)
         strcpy(send_buf, m_proto.convert(send_command, val, sock, croupier, pls, error).c_str());
         
         m_isClientsUpdateMutex.lock();
+        iResult = send( sock, send_buf, send_buf_len, 0);
+        if (iResult == SOCKET_ERROR) {
+            wprintf(L"send failed with error: %d\n", WSAGetLastError());
+            closesocket(sock);
+            //TODO off client
+            throw 6;
+        }
 	//send(isError?error:isUpdate?info,m_update=false:ok);
+        cout << "send buf: " << send_buf << endl;
         if (send_command == "info" || send_command == "stop")
             m_isClientsUpdate.at(sock) = false;
+        //cout << "ok!" << endl;
         m_isClientsUpdateMutex.unlock();
     }
+    cout << sock << "end exchange" << endl;
 }
 
 string MyServer::analize(const string& command, const Player& player_param, const string& pass, SOCKET sock, string &error)
@@ -280,41 +297,42 @@ string MyServer::analize(const string& command, const Player& player_param, cons
     if (command == "ok") {
         m_isClientsUpdateMutex.lock();
         bool upd = m_isClientsUpdate.at(sock);
+        cout << upd << endl;
         m_isClientsUpdateMutex.unlock();
         string res = upd ? "info" : "ok";
-        if (upd) updateAll();
         return res;
     }
     else if (command == "stop") {
         m_gameMutex.lock();
         m_game.delPlayer(sock);
         m_gameMutex.unlock();
-        delAndJoin(sock);
-        updateAll();
+        cout << "push for del" << endl;
+        preDelClient(sock);
+        m_needToDel.push(sock);
+        return "stop from client";
     }
     else if (command == "enter_p") {
         m_gameMutex.lock();
         m_game.addPlayer(sock, player_param.money, error);
         m_gameMutex.unlock();
-        updateAll();
     }
     else if (command == "enter_c") {
         m_gameMutex.lock();
         m_game.addCroupier(sock, pass, error);
         m_gameMutex.unlock();
-        updateAll();
     }
     else if (command == "bet") {
         m_gameMutex.lock();
-        m_game.setBet(player_param.bet, sock, error);
+        if (m_game.getCroupier() == sock)
+            m_game.setBet(player_param.bet, sock, error);
+        else
+            error += "you are not croupier";
         m_gameMutex.unlock();
-        updateAll();
     }
     else if (command == "rotate") {
         m_gameMutex.lock();
         m_game.doBets();
         m_gameMutex.unlock();
-        updateAll();
     }
     else {
         error += "wrong command type\n";
@@ -324,6 +342,7 @@ string MyServer::analize(const string& command, const Player& player_param, cons
         return "error";
     }
     else {
+        updateAll();
         return "info";
     }
 }
@@ -336,4 +355,45 @@ void MyServer::updateAll()
         i->second = true;
     }
     m_isClientsUpdateMutex.unlock();
+}
+
+void MyServer::preDelClient(SOCKET sock)
+{
+    m_isClientsStartedMutex.lock();
+    m_isClientsStarted.at(sock) = false;
+    m_isClientsStartedMutex.unlock();
+    
+    m_isClientsUpdateMutex.lock();
+    m_isClientsUpdate.at(sock) = false;
+    m_isClientsUpdateMutex.unlock();
+}
+
+void MyServer::delClients()
+{
+    while (m_delStarted)
+    {
+        while (m_needToDel.size() != 0) {
+            SOCKET sock = m_needToDel.front();
+            m_needToDel.pop();
+            
+            m_clientsMutex.lock();
+            m_clients.at(sock)->join();
+            m_clientsMutex.unlock();
+            
+            m_isClientsStartedMutex.lock();
+            m_isClientsStarted.erase(sock);
+            m_isClientsStartedMutex.unlock();
+            
+            m_isClientsUpdateMutex.lock();
+            m_isClientsUpdate.erase(sock);
+            m_isClientsUpdateMutex.unlock();
+            
+            m_clientsMutex.lock();
+            m_clients.erase(sock);
+            cout << "size " << m_clients.size() << endl;
+            m_clientsMutex.unlock();
+            cout << " player " << sock << " deleted" << endl;
+        }
+        this_thread::sleep_for(chrono::seconds(1));
+    }
 }

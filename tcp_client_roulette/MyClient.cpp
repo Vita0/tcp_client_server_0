@@ -107,14 +107,14 @@ void MyClient::start()
 
 void MyClient::getCommand()
 {
-    Protocol p;
     while (m_started)
     {
         m_commandInfo = "enter command:";
         updateScreen();
         string s = "";
-        cin >> s;
-        if (!m_started) break;
+        getline(cin, s);
+        m_command = s;
+        //if (!m_started) break;
 
     }
 }
@@ -124,42 +124,110 @@ void MyClient::exchange()
     Protocol p;
     while (m_started)
     {
-        const int sendbuflen = p.sendClientBufLen;
-        char sendbuf[sendbuflen+1];
+        const int send_buf_len = p.sendClientBufLen;
+        char send_buf[send_buf_len+1];
+        
+//        string s = "";
+//        getline(cin, s);
+//        m_command = s;
         
         if (m_command == "") {
-            strcpy(sendbuf, "ok");
-            this_thread::sleep_for(chrono::milliseconds(10));
-            cout << "ok" << endl;
+            strcpy(send_buf, "ok");
+            this_thread::sleep_for(chrono::milliseconds(1000/*25*/));
         }
         else {
+            strcpy(send_buf, m_command.c_str());
+            m_command = "";
             //TODO
         }
         //TODO
 
-        int iResult = send( m_socket, sendbuf, sendbuflen, 0);
+        int iResult = send( m_socket, send_buf, send_buf_len, 0);
         if (iResult == SOCKET_ERROR) {
             wprintf(L"send failed with error: %d\n", WSAGetLastError());
             closesocket(m_socket);
             throw 6;
         }
+        if (strcmp(send_buf,"stop") == 0)
+        {
+            m_started = false;
+            break;
+        }
         
-        
-        const int recvbuflen = p.sendServerBufLen;
-        char recvbuf[recvbuflen+1];
-        iResult = readn(m_socket, recvbuf, recvbuflen);
+        const int recv_buf_len = p.sendServerBufLen;
+        char recv_buf[recv_buf_len+1];
+        iResult = readn(m_socket, recv_buf, recv_buf_len);
         if ( iResult > 0 ) {
-            wprintf(L"%s\n",recvbuf);
-            wprintf(L"Bytes received: %d\n", iResult);
+            //wprintf(L"%s\n",recvbuf);
+            //wprintf(L"Bytes received: %d\n", iResult);
         }
         else if ( iResult == 0 ) {
             wprintf(L"Connection closed\n");
             m_started = false;
+            break;
         }
         else {
             wprintf(L"recv failed: %d\n", WSAGetLastError());
             m_started = false;
+            break;
         }
+        
+        bool upd = true;
+        char buf[p.headerLen + 1];
+        sscanf(recv_buf, "%s", buf);
+        string recv_command = buf;
+        char *rb = recv_buf;
+        rb += strlen(buf);
+        
+        if (recv_command == "error")
+        {
+            string er = recv_buf;
+            //cout << er << endl;
+            addError(m_serverErrors,er);
+        }
+        else if (recv_command == "info")
+        {
+            int inc = 0;
+            char tmp1[p.headerLen + 2];
+            char tmp2[p.headerLen + 2];
+            char tmp3[p.headerLen + 2];
+            sscanf(rb, "%s %s %s", tmp1, tmp2, tmp3);
+            m_rouletteValue = tmp1;
+            m_number = tmp2;
+            m_croupier = tmp3;
+            inc = strlen(tmp1) + strlen(tmp2) + strlen(tmp3) + 3 + 6;
+            //cout << "inc: " << inc << endl;
+            rb += inc;
+            //cout << "rb: " << rb << endl;
+            
+            for(int i = 0; i != MAX_PLAYER_COUNT; ++i)
+            {
+                char bet_val[BET_TYPE::max_string_len + 1];
+                sscanf(rb, "%d %s %d %d %d %d %d ", 
+                        &m_players.at(i).first, bet_val, &m_players.at(i).second.bet.number,
+                        &m_players.at(i).second.bet.money, &m_players.at(i).second.last_bet,
+                        &m_players.at(i).second.last_win, &m_players.at(i).second.money);
+                m_players.at(i).second.bet.betValue = bet_val;
+                
+                char tmp[p.sendServerBufLen + 1];
+                sprintf(tmp, "%d %s %d %d %d %d %d ",
+                        m_players.at(i).first, bet_val, m_players.at(i).second.bet.number,
+                        m_players.at(i).second.bet.money, m_players.at(i).second.last_bet,
+                        m_players.at(i).second.last_win, m_players.at(i).second.money);
+                inc = strlen(tmp);
+                rb += inc;
+            }
+        }
+        else if (recv_command == "ok")
+        {
+            upd = false;
+        }
+        else if (recv_command == "stop")
+        {
+            m_started = false;
+            break;
+        }
+        if (upd) updateScreen();
     }
 }
 
@@ -170,20 +238,20 @@ void MyClient::updateScreen()
     string roulette_value = (m_rouletteValue==NO_VALUE_str)?"was now games yet":m_rouletteValue;
     cout << "info:" << endl;
     cout << "             croupier: " << croupier << "     you number: " << m_number << endl << endl;
-    cout << "                  last roulette value: " << roulette_value << endl;
+    cout << "                  last roulette value: " << roulette_value << endl << endl;
     cout << "        <player>   <bet>   <number>  <money> <last bet>  <last win> <money>   " << endl;
     for(auto i=m_players.begin(); i!=m_players.end(); ++i)
-    cout << "                    " << i->first << "\t" << i->second.bet.betValue 
-                                    << "\t" << i->second.bet.number << "\t" << i->second.bet.money 
-                                    << "\t" << i->second.last_bet << "\t" << i->second.last_win 
-                                    << "\t" << i->second.money << endl;
-    cout << " last (s) errors:" << endl;
+    cout << "        " << i->first << "\t" << i->second.bet.betValue 
+                       << "\t" << i->second.bet.number << "\t" << i->second.bet.money 
+                       << "\t" << i->second.last_bet << "\t" << i->second.last_win 
+                       << "\t" << i->second.money << endl;
+    cout << " last (s) errors:" << endl << endl;
     for(auto error = m_serverErrors.begin(); error != m_serverErrors.end(); ++error)
-    cout << "                 " << *error << endl;
-    cout << " last (c) errors:" << endl;
-    for(auto error = m_clientErrors.begin(); error != m_clientErrors.end(); ++error)
-    cout << "                 " << *error << endl;
-    cout << "    command info:" << m_commandInfo << endl;
+    cout << "                 " << *error << endl << endl;
+//    cout << " last (c) errors:" << endl;
+//    for(auto error = m_clientErrors.begin(); error != m_clientErrors.end(); ++error)
+//    cout << "                 " << *error << endl;
+//    cout << "    command info:" << m_commandInfo << endl;
 }
 
 
