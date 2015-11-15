@@ -120,10 +120,15 @@ public:
         m_players.insert(pair<SOCKET,Player>(sock, lol));
     }
     
+    bool isPlayer(SOCKET sock)
+    {
+        return m_players.find(sock) != m_players.end();
+    }
+    
     void addCroupier(SOCKET sock, string const &pass, string &error)
     {
         if (m_croupier != 0)
-            error += "croupier plase is busy\n";
+            error += "croupier place is busy\n";
         else if ( !checkCroupierPassword(pass) )
             error += "invalid password\n";
         else
@@ -144,6 +149,7 @@ public:
     }
     
     void setBet(const Bet &bet, SOCKET sock, string &error) {
+        cout << "bad" << endl;
         if (!isNoBets(sock)) {
             error += "you can't do more then one bet\n";
         }

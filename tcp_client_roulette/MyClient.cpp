@@ -114,8 +114,7 @@ void MyClient::getCommand()
         string s = "";
         getline(cin, s);
         m_command = s;
-        //if (!m_started) break;
-
+        if (m_command == "stop") break;
     }
 }
 

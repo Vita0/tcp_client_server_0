@@ -68,8 +68,8 @@ private:
 
 #endif	/* MYSERVER_H */
 
-//TODO del players - by server or by client
-//TODO players do not 
+//croupier bet failed
+//TODO del players - by server
 //TODO rand
 //TODO remove player, when recive failed
 //TODO server accept whithout errors - may be because netbeans can't understand windows function / or some mingw problem

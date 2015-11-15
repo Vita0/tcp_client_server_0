@@ -108,7 +108,7 @@ void MyServer::myAccept()
         if (ac_sock == INVALID_SOCKET) {
             wprintf(L"accept failed with error: %ld\n", WSAGetLastError());
             closesocket(m_listen);
-            m_started = false;
+            //m_started = false;
             //WSACleanup();
             break;
         } if (ac_sock == WSAEWOULDBLOCK) {
@@ -168,7 +168,6 @@ void MyServer::getCommands()
         }
         else if (s == "stop")
         {
-            m_started = false;
             closesocket(m_listen);
             m_clientsMutex.lock();
             for(auto it = m_clients.begin(); it != m_clients.end(); ++it)
@@ -178,6 +177,8 @@ void MyServer::getCommands()
             }
             m_clientsMutex.unlock();
             m_delStarted = false;
+            m_cleanThread->join();
+            m_started = false;
         }
     }
 }
@@ -217,17 +218,12 @@ void MyServer::delAndJoin(SOCKET sock)
 
 void MyServer::exchange(SOCKET sock)
 {
-    m_isClientsStartedMutex.lock();
-    bool exch_started = m_isClientsStarted.at(sock);
-    m_isClientsStartedMutex.unlock();
-    
     int recv_buf_len = m_proto.sendClientBufLen;
     char recv_buf[recv_buf_len+1] = "";
     
     int send_buf_len = m_proto.sendServerBufLen;
     char send_buf[send_buf_len+1] = "";
     
-    //bool is_exit = false;
     while (m_started)
     {
 	int iResult = readn(sock, recv_buf, recv_buf_len);
@@ -237,15 +233,19 @@ void MyServer::exchange(SOCKET sock)
         }
         else if ( iResult == 0 ) {
             wprintf(L"Connection closed\n");
-            m_started = false;
+            preDelClient(sock);
+            m_needToDel.push(sock);
+            break;
         }
         else {
             wprintf(L"recv failed: %d\n", WSAGetLastError());
-            m_started = false;
+            preDelClient(sock);
+            m_needToDel.push(sock);
+            break;
         }
         
         m_isClientsStartedMutex.lock();
-        exch_started = m_isClientsStarted.at(sock);
+        bool exch_started = m_isClientsStarted.at(sock);
         m_isClientsStartedMutex.unlock();
         
         string send_command;
@@ -253,7 +253,6 @@ void MyServer::exchange(SOCKET sock)
         if (!exch_started) {    // если сервер остановил
             cout << "!exch_started" << endl;
             send_command = "stop";
-            m_started = false;
         }
 	else {
             string command;
@@ -284,12 +283,18 @@ void MyServer::exchange(SOCKET sock)
         }
 	//send(isError?error:isUpdate?info,m_update=false:ok);
         cout << "send buf: " << send_buf << endl;
-        if (send_command == "info" || send_command == "stop")
+        if (send_command == "info")
             m_isClientsUpdate.at(sock) = false;
         //cout << "ok!" << endl;
         m_isClientsUpdateMutex.unlock();
+        if (send_command == "stop")
+        {
+            preDelClient(sock);
+            m_needToDel.push(sock);
+            break;
+        }
     }
-    cout << sock << "end exchange" << endl;
+    cout << sock << " end exchange" << endl;
 }
 
 string MyServer::analize(const string& command, const Player& player_param, const string& pass, SOCKET sock, string &error)
@@ -323,15 +328,18 @@ string MyServer::analize(const string& command, const Player& player_param, cons
     }
     else if (command == "bet") {
         m_gameMutex.lock();
-        if (m_game.getCroupier() == sock)
+        if (m_game.isPlayer(sock))
             m_game.setBet(player_param.bet, sock, error);
         else
-            error += "you are not croupier";
+            error += "you are not player";
         m_gameMutex.unlock();
     }
     else if (command == "rotate") {
         m_gameMutex.lock();
-        m_game.doBets();
+        if (m_game.getCroupier() == sock)
+            m_game.doBets();
+        else
+            error += "you are not croupier";
         m_gameMutex.unlock();
     }
     else {
