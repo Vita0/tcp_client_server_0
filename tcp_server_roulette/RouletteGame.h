@@ -10,6 +10,8 @@
 
 #include <map>
 #include <utility> //pair
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>   /* time */
 
 using namespace std;
 
@@ -103,12 +105,12 @@ public:
         }
         if (m_players.size() == 4)
         {
-            error += "max players are plaing now\n";
+            error = "max players are plaing now";
             return;
         }
         if (money <= 0 || money > 10000)
         {
-            error += "invalid money";
+            error = "invalid money";
             return;
         }
         Player lol;
@@ -128,9 +130,9 @@ public:
     void addCroupier(SOCKET sock, string const &pass, string &error)
     {
         if (m_croupier != 0)
-            error += "croupier place is busy\n";
+            error = "croupier place is busy";
         else if ( !checkCroupierPassword(pass) )
-            error += "invalid password\n";
+            error = "invalid password";
         else
             m_croupier = sock;
         return;
@@ -149,9 +151,8 @@ public:
     }
     
     void setBet(const Bet &bet, SOCKET sock, string &error) {
-        cout << "bad" << endl;
         if (!isNoBets(sock)) {
-            error += "you can't do more then one bet\n";
+            error = "you can't do more then one bet";
         }
         else if (bet.money <= m_players.at(sock).money &&
                 (bet.number >=0 && bet.number < NO_VALUE || bet.betValue != BET_TYPE::number)) {
@@ -159,13 +160,17 @@ public:
             m_players.at(sock).money -= bet.money;
         }
         else {
-            error += "wrong bet\n";
+            error = "wrong bet";
         }
         return;
     }
     
     void doBets() {
-        m_rouletteValue = 15; //TODO rand
+        /* initialize random seed: */
+        srand (time(NULL));
+        /* generate secret number between 1 and 10: */
+        m_rouletteValue = rand() % 36 + 1;
+
         bool odd = m_rouletteValue%2;
         bool onesecond = m_rouletteValue<(NO_VALUE-1)/2;
         

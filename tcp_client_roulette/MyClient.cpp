@@ -15,7 +15,7 @@ int readn(SOCKET fd, char *data, size_t data_len)
         {
             if ( errno == EINTR )
                 continue;
-            wprintf(L"recv failed: %d\n", WSAGetLastError());
+            printf("recv failed: %d\n", WSAGetLastError());
             return -1;
         }
         if ( res == 0 )
@@ -32,7 +32,6 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     ,m_number("")
     ,m_croupier("")
     ,m_rouletteValue(NO_VALUE_str)
-    ,m_commandInfo("")
 {
     m_players.resize(m_players_count);
     for(auto i=m_players.begin(); i!=m_players.end(); ++i)
@@ -42,14 +41,13 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     for(int i = 0; i < 3; ++i)
     {
         m_serverErrors.push_back("");
-        m_clientErrors.push_back("");
     }
     
     WSADATA wsaData;
     // The WSAStartup function initiates use of the Winsock DLL by a process.
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != NO_ERROR) {
-        wprintf(L"WSAStartup failed with error: %ld\n", iResult);
+        printf("WSAStartup failed with error: %ld\n", iResult);
         throw 1;
     }
     //----------------------
@@ -57,7 +55,7 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     // incoming connection requests.
     m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_socket == INVALID_SOCKET) {
-        wprintf(L"socket failed with error: %ld\n", WSAGetLastError());
+        printf("socket failed with error: %ld\n", WSAGetLastError());
         //WSACleanup();
         throw 2;
     }
@@ -75,7 +73,7 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     iResult = connect( m_socket, (SOCKADDR*) &clientService, sizeof(clientService) );
     if ( iResult == SOCKET_ERROR) {
         closesocket (m_socket);
-        wprintf(L"Unable to connect to server: %ld\n", WSAGetLastError());
+        printf("Unable to connect to server: %ld\n", WSAGetLastError());
         //WSACleanup();
         throw 3;
     }
@@ -86,7 +84,7 @@ MyClient::~MyClient()
     // shutdown the connection since no more data will be sent
     int iResult = shutdown(m_socket, SD_SEND);
     if (iResult == SOCKET_ERROR) {
-        wprintf(L"shutdown failed: %d\n", WSAGetLastError());
+        printf("shutdown failed: %d\n", WSAGetLastError());
         //closesocket(m_socket);
         //WSACleanup();
     }
@@ -109,7 +107,6 @@ void MyClient::getCommand()
 {
     while (m_started)
     {
-        m_commandInfo = "enter command:";
         updateScreen();
         string s = "";
         getline(cin, s);
@@ -126,10 +123,6 @@ void MyClient::exchange()
         const int send_buf_len = p.sendClientBufLen;
         char send_buf[send_buf_len+1];
         
-//        string s = "";
-//        getline(cin, s);
-//        m_command = s;
-        
         if (m_command == "") {
             strcpy(send_buf, "ok");
             this_thread::sleep_for(chrono::milliseconds(1000/*25*/));
@@ -137,13 +130,11 @@ void MyClient::exchange()
         else {
             strcpy(send_buf, m_command.c_str());
             m_command = "";
-            //TODO
         }
-        //TODO
 
         int iResult = send( m_socket, send_buf, send_buf_len, 0);
         if (iResult == SOCKET_ERROR) {
-            wprintf(L"send failed with error: %d\n", WSAGetLastError());
+            printf("send failed with error: %d\n", WSAGetLastError());
             closesocket(m_socket);
             throw 6;
         }
@@ -157,16 +148,16 @@ void MyClient::exchange()
         char recv_buf[recv_buf_len+1];
         iResult = readn(m_socket, recv_buf, recv_buf_len);
         if ( iResult > 0 ) {
-            //wprintf(L"%s\n",recvbuf);
-            //wprintf(L"Bytes received: %d\n", iResult);
+            //printf("%s\n",recvbuf);
+            //printf("Bytes received: %d\n", iResult);
         }
         else if ( iResult == 0 ) {
-            wprintf(L"Connection closed\n");
+            printf("Connection closed\n");
             m_started = false;
             break;
         }
         else {
-            wprintf(L"recv failed: %d\n", WSAGetLastError());
+            printf("recv failed: %d\n", WSAGetLastError());
             m_started = false;
             break;
         }
@@ -181,7 +172,6 @@ void MyClient::exchange()
         if (recv_command == "error")
         {
             string er = recv_buf;
-            //cout << er << endl;
             addError(m_serverErrors,er);
         }
         else if (recv_command == "info")
@@ -195,9 +185,7 @@ void MyClient::exchange()
             m_number = tmp2;
             m_croupier = tmp3;
             inc = strlen(tmp1) + strlen(tmp2) + strlen(tmp3) + 3 + 6;
-            //cout << "inc: " << inc << endl;
             rb += inc;
-            //cout << "rb: " << rb << endl;
             
             for(int i = 0; i != MAX_PLAYER_COUNT; ++i)
             {
@@ -224,6 +212,7 @@ void MyClient::exchange()
         else if (recv_command == "stop")
         {
             m_started = false;
+            cout << "you stoped by server. press any key" << endl;
             break;
         }
         if (upd) updateScreen();
@@ -247,10 +236,6 @@ void MyClient::updateScreen()
     cout << " last (s) errors:" << endl << endl;
     for(auto error = m_serverErrors.begin(); error != m_serverErrors.end(); ++error)
     cout << "                 " << *error << endl << endl;
-//    cout << " last (c) errors:" << endl;
-//    for(auto error = m_clientErrors.begin(); error != m_clientErrors.end(); ++error)
-//    cout << "                 " << *error << endl;
-//    cout << "    command info:" << m_commandInfo << endl;
 }
 
 

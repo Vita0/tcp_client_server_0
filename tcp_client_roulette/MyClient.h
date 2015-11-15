@@ -36,10 +36,8 @@ private:
     string m_number;
     string m_croupier;
     string m_rouletteValue;
-    string m_commandInfo;
     vector< pair<SOCKET, Player> > m_players;
     deque<string> m_serverErrors;
-    deque<string> m_clientErrors;
 public:
     MyClient(const char *server_ip, u_short server_port);
     ~MyClient();

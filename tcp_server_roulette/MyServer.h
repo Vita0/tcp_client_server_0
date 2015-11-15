@@ -52,8 +52,6 @@ public:
     void start();
 private:
     void myAccept();
-    void delAndJoinAll();
-    void delAndJoin(SOCKET sock);
     void printClientInfo(SOCKET ac_sock);
     void getCommands();
     void exchange(SOCKET sock);
@@ -68,8 +66,4 @@ private:
 
 #endif	/* MYSERVER_H */
 
-//croupier bet failed
-//TODO del players - by server
-//TODO rand
-//TODO remove player, when recive failed
 //TODO server accept whithout errors - may be because netbeans can't understand windows function / or some mingw problem

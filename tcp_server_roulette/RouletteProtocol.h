@@ -13,7 +13,6 @@
 #include <string.h>
 
 using namespace std;
-//int readn(SOCKET fd, char *data, size_t data_len);
 
 class Protocol
 {
@@ -64,9 +63,6 @@ public:
         else if (command == "rotate") {
             return;
         }
-        
-        // Client commands
-        
     }
     
     string convert(const string &command, const int val,
@@ -108,10 +104,6 @@ public:
         }
     }
 };
-
-//const int Protocol::sendServerBufLen = 100;
-//const int Protocol::sendClientBufLen = 20;
-//const int Protocol::headerLen = 10;
 
 #endif	/* PROTOCOLROULETTE_H */
 

@@ -75,9 +75,6 @@ void tests()
     cout << "res len: " << res.length() << endl;;
     cout << res << "!!!" << endl;
     
-    //client recive
-    
-    
     cout << "tests done !!!" << endl;
 }
 
@@ -85,10 +82,6 @@ void tests()
  * 
  */
 int main(int argc, char** argv) {
-    //int i = 0, j = 1;
-    //for(; i < j; ++i, ++j) {}
-    //cout << "max int" << i << endl;
-    tests();
     try 
     {
         MyServer server("127.0.0.1",27015);
