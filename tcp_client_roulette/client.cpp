@@ -5,8 +5,6 @@
  * Created on 27 октября 2015 г., 11:00
  */
 
-#pragma comment(lib,"wsock32.lib")
-
 #include "MyClient.h"
 
 using namespace std;

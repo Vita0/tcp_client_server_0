@@ -8,7 +8,22 @@
 #ifndef MYCLIENT_H
 #define	MYCLIENT_H
 
-#include <Winsock2.h>
+#include "../LinuxWindows.h"
+
+#ifdef WINDOWS_OS
+#pragma comment(lib,"wsock32.lib")
+//linker -lWs2_32
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+//#include <sys/stat.h> 
+//#include <sys/un.h>
+//#include <netdb.h>
+//#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#endif
+
 #include <memory>
 #include <thread>
 #include <mutex>
@@ -23,7 +38,7 @@ using namespace std;
 class MyClient
 {
 private:
-    SOCKET m_socket;
+    crossSocket m_socket;
     bool m_started;
     const int m_players_count;
     
@@ -36,7 +51,7 @@ private:
     string m_number;
     string m_croupier;
     string m_rouletteValue;
-    vector< pair<SOCKET, Player> > m_players;
+    vector< pair<crossSocket, Player> > m_players;
     deque<string> m_serverErrors;
 public:
     MyClient(const char *server_ip, u_short server_port);

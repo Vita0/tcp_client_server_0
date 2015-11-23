@@ -8,7 +8,7 @@
 #ifndef MYSERVER_H
 #define	MYSERVER_H
 
-#include <Winsock2.h>
+#include "../LinuxWindows.h"
 #include <memory>
 #include <thread>
 #include <mutex>
@@ -30,18 +30,18 @@ private:
     mutex m_isClientsStartedMutex;
     mutex m_isClientsUpdateMutex;
     
-    map<SOCKET,shared_ptr<thread>> m_clients;
-    map<SOCKET,bool> m_isClientsStarted;
-    map<SOCKET,bool> m_isClientsUpdate;
+    map<crossSocket,shared_ptr<thread>> m_clients;
+    map<crossSocket,bool> m_isClientsStarted;
+    map<crossSocket,bool> m_isClientsUpdate;
     
-    SOCKET m_listen;
+    crossSocket m_listen;
     bool m_started;
     bool m_delStarted;
     
     Game m_game;
     Protocol m_proto;
     
-    queue<SOCKET> m_needToDel;
+    queue<crossSocket> m_needToDel;
     
     shared_ptr<thread> m_acceptThread;
     shared_ptr<thread> m_comandsThread;
@@ -52,14 +52,14 @@ public:
     void start();
 private:
     void myAccept();
-    void printClientInfo(SOCKET ac_sock);
+    void printClientInfo(crossSocket ac_sock);
     void getCommands();
-    void exchange(SOCKET sock);
+    void exchange(crossSocket sock);
     string analize(const string &command, const Player &player_param, const string &pass, 
-                 SOCKET sock, string &error);
+                 crossSocket sock, string &error);
     void updateAll();
     
-    void preDelClient(SOCKET sock);
+    void preDelClient(crossSocket sock);
     void delClients();
 };
 

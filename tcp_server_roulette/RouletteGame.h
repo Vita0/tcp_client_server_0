@@ -68,11 +68,11 @@ class Game
 {
 private:
     const short m_maxPlayers;
-    SOCKET m_croupier;
+    crossSocket m_croupier;
     const string m_croupierPassword;
     short m_rouletteValue;
 
-    map<SOCKET,Player> m_players;
+    map<crossSocket,Player> m_players;
 public:
     Game() :m_maxPlayers(MAX_PLAYER_COUNT)
            ,m_croupier(0)
@@ -85,11 +85,11 @@ public:
         return m_rouletteValue;
     }
     
-    map<SOCKET,Player> getPlayers() {
+    map<crossSocket,Player> getPlayers() {
         return m_players;
     }
     
-    SOCKET getCroupier() {
+    crossSocket getCroupier() {
         return m_croupier;
     }
     
@@ -97,7 +97,7 @@ public:
         return s == m_croupierPassword;
     }
     
-    void addPlayer(SOCKET sock, int money, string &error)
+    void addPlayer(crossSocket sock, int money, string &error)
     {
         if (m_players.find(sock) != m_players.end())
         {
@@ -119,15 +119,15 @@ public:
         lol.last_win = 0;
         Bet bet;
         lol.bet = bet;
-        m_players.insert(pair<SOCKET,Player>(sock, lol));
+        m_players.insert(pair<crossSocket,Player>(sock, lol));
     }
     
-    bool isPlayer(SOCKET sock)
+    bool isPlayer(crossSocket sock)
     {
         return m_players.find(sock) != m_players.end();
     }
     
-    void addCroupier(SOCKET sock, string const &pass, string &error)
+    void addCroupier(crossSocket sock, string const &pass, string &error)
     {
         if (m_croupier != 0)
             error = "croupier place is busy";
@@ -138,7 +138,7 @@ public:
         return;
     }
     
-    void delPlayer(SOCKET sock)
+    void delPlayer(crossSocket sock)
     {
         if (sock == m_croupier) {
             m_croupier = 0;
@@ -146,11 +146,11 @@ public:
         m_players.erase(sock);
     }
     
-    bool isNoBets(const SOCKET sock) {
+    bool isNoBets(const crossSocket sock) {
         return m_players.at(sock).bet.betValue == BET_TYPE::no_bet;
     }
     
-    void setBet(const Bet &bet, SOCKET sock, string &error) {
+    void setBet(const Bet &bet, crossSocket sock, string &error) {
         if (!isNoBets(sock)) {
             error = "you can't do more then one bet";
         }

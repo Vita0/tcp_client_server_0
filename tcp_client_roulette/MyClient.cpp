@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string>
 
-int readn(SOCKET fd, char *data, size_t data_len)
+int readn(crossSocket fd, char *data, size_t data_len)
 {
     int cnt;
     int res;
@@ -15,7 +15,13 @@ int readn(SOCKET fd, char *data, size_t data_len)
         {
             if ( errno == EINTR )
                 continue;
-            printf("recv failed: %d\n", WSAGetLastError());
+            printf("recv failed: %d\n", 
+#ifdef WINDOWS_OS
+                    WSAGetLastError()
+#else
+                    errno
+#endif
+                    );
             return -1;
         }
         if ( res == 0 )
@@ -43,19 +49,35 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
         m_serverErrors.push_back("");
     }
     
+    int iResult;
+#ifdef WINDOWS_OS
     WSADATA wsaData;
     // The WSAStartup function initiates use of the Winsock DLL by a process.
-    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != NO_ERROR) {
         printf("WSAStartup failed with error: %ld\n", iResult);
         throw 1;
     }
+#endif
+    
     //----------------------
-    // Create a SOCKET for listening for
+    // Create a crossSocket for listening for
     // incoming connection requests.
     m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (m_socket == INVALID_SOCKET) {
-        printf("socket failed with error: %ld\n", WSAGetLastError());
+    if (m_socket == 
+#ifdef WINDOWS_OS
+            INVALID_SOCKET
+#else
+            -1
+#endif
+            ) {
+        printf("socket failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                WSAGetLastError()
+#else
+                errno
+#endif
+                );
         //WSACleanup();
         throw 2;
     }
@@ -65,15 +87,36 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     // IP address, and port of the server to be connected to.
     clientService.sin_family = AF_INET;
     clientService.sin_addr.s_addr = inet_addr(server_ip);
-	//clientService.sin_addr.s_addr = inet_pton(AF_INET,);
     clientService.sin_port = htons(server_port);
 
     //----------------------
     // Connect to server.
-    iResult = connect( m_socket, (SOCKADDR*) &clientService, sizeof(clientService) );
-    if ( iResult == SOCKET_ERROR) {
+    iResult = connect( m_socket, (
+#ifdef WINDOWS_OS
+                                    SOCKADDR
+#else
+                                    struct sockaddr
+#endif
+                                    *) &clientService, sizeof(clientService) );
+    if ( iResult == 
+#ifdef WINDOWS_OS
+                    SOCKET_ERROR
+#else
+                    -1
+#endif
+            ) {
+#ifdef WINDOWS_OS
         closesocket (m_socket);
-        printf("Unable to connect to server: %ld\n", WSAGetLastError());
+#else
+        close (m_socket);
+#endif
+        printf("Unable to connect to server: %ld\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                );
         //WSACleanup();
         throw 3;
     }
@@ -82,16 +125,39 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
 MyClient::~MyClient()
 {
     // shutdown the connection since no more data will be sent
-    int iResult = shutdown(m_socket, SD_SEND);
-    if (iResult == SOCKET_ERROR) {
-        printf("shutdown failed: %d\n", WSAGetLastError());
+    int iResult = shutdown(m_socket, 
+#ifdef WINDOWS_OS
+                                    SD_SEND
+#else
+                                    SHUT_RDWR
+#endif
+                           );
+    if (iResult == 
+#ifdef WINDOWS_OS
+            SOCKET_ERROR
+#else
+            -1
+#endif
+            ) {
+        printf("shutdown failed: %d\n", 
+#ifdef WINDOWS_OS
+                                        WSAGetLastError()
+#else
+                                        errno
+#endif
+                );
         //closesocket(m_socket);
         //WSACleanup();
     }
     
     // cleanup
-    closesocket(m_socket);
-    WSACleanup();
+#ifdef WINDOWS_OS
+        closesocket (m_socket);
+        WSACleanup();
+#else
+        close (m_socket);
+#endif
+    
 }
 
 void MyClient::start()
@@ -133,9 +199,25 @@ void MyClient::exchange()
         }
 
         int iResult = send( m_socket, send_buf, send_buf_len, 0);
-        if (iResult == SOCKET_ERROR) {
-            printf("send failed with error: %d\n", WSAGetLastError());
-            closesocket(m_socket);
+        if (iResult == 
+#ifdef WINDOWS_OS
+            SOCKET_ERROR
+#else
+            -1
+#endif
+            ) {
+            printf("send failed with error: %d\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                   );
+#ifdef WINDOWS_OS
+            closesocket (m_socket);
+#else
+            close (m_socket);
+#endif
             throw 6;
         }
         if (strcmp(send_buf,"stop") == 0)
@@ -157,7 +239,13 @@ void MyClient::exchange()
             break;
         }
         else {
-            printf("recv failed: %d\n", WSAGetLastError());
+            printf("recv failed: %d\n", 
+#ifdef WINDOWS_OS
+                                        WSAGetLastError()
+#else
+                                        errno
+#endif
+                   );
             m_started = false;
             break;
         }

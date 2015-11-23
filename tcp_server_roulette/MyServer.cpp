@@ -3,7 +3,7 @@
 
 #include "MyServer.h"
 
-int readn(SOCKET fd, char *data, size_t data_len)
+int readn(crossSocket fd, char *data, size_t data_len)
 {
     int cnt;
     int res;
@@ -94,7 +94,7 @@ void MyServer::myAccept()
 {
     while (m_started)
     {
-        SOCKET ac_sock;
+        crossSocket ac_sock;
         
         //nonblocking
         //u_int nb = 1;
@@ -129,7 +129,7 @@ void MyServer::myAccept()
     
 }
 
-void MyServer::printClientInfo(SOCKET ac_sock) {
+void MyServer::printClientInfo(crossSocket ac_sock) {
     sockaddr_in ac_service;
     int len = sizeof(ac_service);
     if (getsockname(ac_sock, (SOCKADDR* ) &ac_service, &len)
@@ -179,7 +179,7 @@ void MyServer::getCommands()
     }
 }
 
-void MyServer::exchange(SOCKET sock)
+void MyServer::exchange(crossSocket sock)
 {
     int recv_buf_len = m_proto.sendClientBufLen;
     char recv_buf[recv_buf_len+1] = "";
@@ -231,8 +231,8 @@ void MyServer::exchange(SOCKET sock)
         }
         
         m_gameMutex.lock();
-        map<SOCKET, Player> pls = m_game.getPlayers();
-        SOCKET croupier = m_game.getCroupier();
+        map<crossSocket, Player> pls = m_game.getPlayers();
+        crossSocket croupier = m_game.getCroupier();
         int val = m_game.getValue();
         m_gameMutex.unlock();
         
@@ -260,7 +260,7 @@ void MyServer::exchange(SOCKET sock)
     m_gameMutex.unlock();
 }
 
-string MyServer::analize(const string& command, const Player& player_param, const string& pass, SOCKET sock, string &error)
+string MyServer::analize(const string& command, const Player& player_param, const string& pass, crossSocket sock, string &error)
 {
     if (command == "ok") {
         m_isClientsUpdateMutex.lock();
@@ -326,7 +326,7 @@ void MyServer::updateAll()
     m_isClientsUpdateMutex.unlock();
 }
 
-void MyServer::preDelClient(SOCKET sock)
+void MyServer::preDelClient(crossSocket sock)
 {
     m_isClientsStartedMutex.lock();
     m_isClientsStarted.at(sock) = false;
@@ -343,7 +343,7 @@ void MyServer::delClients()
     {
         this_thread::sleep_for(chrono::seconds(1));
         while (m_needToDel.size() != 0) {
-            SOCKET sock = m_needToDel.front();
+            crossSocket sock = m_needToDel.front();
             m_needToDel.pop();
             
             m_clientsMutex.lock();

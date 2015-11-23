@@ -66,8 +66,8 @@ public:
     }
     
     string convert(const string &command, const int val,
-                   const SOCKET sock, const SOCKET croupier,
-                   const map<SOCKET, Player> &pls, const string &error)
+                   const crossSocket sock, const crossSocket croupier,
+                   const map<crossSocket, Player> &pls, const string &error)
     {
         if (command == "ok" || command == "stop") {
             return command;
