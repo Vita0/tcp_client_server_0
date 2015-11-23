@@ -14,6 +14,7 @@
 #pragma comment(lib,"wsock32.lib")
 //linker -lWs2_32
 #else
+//linker -pthread
 #include <sys/types.h>
 #include <sys/socket.h>
 //#include <sys/stat.h> 
