@@ -5,8 +5,6 @@
  * Created on 27 октября 2015 г., 11:00
  */
 
-#pragma comment(lib,"wsock32.lib")
-
 #include "MyServer.h"
 
 using namespace std;
@@ -64,7 +62,7 @@ void tests()
     pl.last_bet = 1047483647;
     pl.last_win = 1147483647;
     pl.money = 1247483647;
-    map<SOCKET, Player> pls;
+    map<crossSocket, Player> pls;
     string res;
     
     pls.insert(make_pair(1347483647, pl));

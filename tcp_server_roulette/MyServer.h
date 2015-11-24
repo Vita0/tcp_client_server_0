@@ -18,6 +18,21 @@
 #include <string>
 #include <queue>
 
+#ifdef WINDOWS_OS
+#pragma comment(lib,"wsock32.lib")
+//linker -lWs2_32
+#else
+//linker -pthread
+#include <sys/types.h>
+#include <sys/socket.h>
+//#include <sys/stat.h> 
+//#include <sys/un.h>
+//#include <netdb.h>
+//#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#endif
+
 #include "RouletteProtocol.h"
 
 using namespace std;

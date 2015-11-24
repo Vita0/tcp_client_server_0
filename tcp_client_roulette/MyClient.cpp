@@ -1,6 +1,5 @@
 #include "MyClient.h"
 #include <cstring>
-#include <stdio.h>
 #include <string>
 
 int readn(crossSocket fd, char *data, size_t data_len)

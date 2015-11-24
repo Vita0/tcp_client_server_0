@@ -15,7 +15,13 @@ int readn(crossSocket fd, char *data, size_t data_len)
         {
             if ( errno == EINTR )
                 continue;
-            printf("recv failed: %d\n", WSAGetLastError());
+            printf("recv failed: %d\n", 
+#ifdef WINDOWS_OS
+                    WSAGetLastError()
+#else
+                    errno
+#endif
+                    );
             return -1;
         }
         if ( res == 0 )
@@ -30,17 +36,32 @@ MyServer::MyServer(const char* ip, u_short port)
     :m_started(false)
     ,m_delStarted(false)
 {
+    int iResult;
+#ifdef WINDOWS_OS
     WSADATA wsaData;
 
-    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != NO_ERROR) {
         printf("WSAStartup failed with error: %ld\n", iResult);
         throw 1;
     }
+#endif
     
     m_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (m_listen == INVALID_SOCKET) {
-        printf("socket failed with error: %ld\n", WSAGetLastError());
+    if (m_listen == 
+#ifdef WINDOWS_OS
+            INVALID_SOCKET
+#else
+            -1
+#endif
+                    ) {
+        printf("socket failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                WSAGetLastError()
+#else
+                                                errno
+#endif
+                );
         //WSACleanup();
         throw 2;
     }
@@ -56,17 +77,55 @@ MyServer::MyServer(const char* ip, u_short port)
     service.sin_addr.s_addr = inet_addr(ip);
     service.sin_port = htons(port);//0 - is any
     
-    if (bind(m_listen, (SOCKADDR *) & service, sizeof (service))
-            == SOCKET_ERROR) {
-        printf("bind failed with error: %ld\n", WSAGetLastError());
-        closesocket(m_listen);
+    if (bind(m_listen, (
+#ifdef WINDOWS_OS
+                        SOCKADDR
+#else
+                        struct sockaddr
+#endif
+            *) & service, sizeof (service))
+            == 
+#ifdef WINDOWS_OS
+                        SOCKET_ERROR
+#else
+                        -1
+#endif
+            ) {
+        printf("bind failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                WSAGetLastError()
+#else
+                                                errno
+#endif
+                );
+#ifdef WINDOWS_OS
+        closesocket (m_listen);
+#else
+        close (m_listen);
+#endif
         //WSACleanup();
         throw 3;
     }
     
-    if (listen(m_listen, 1) == SOCKET_ERROR) {
-        printf("listen failed with error: %ld\n", WSAGetLastError());
-        closesocket(m_listen);
+    if (listen(m_listen, 1) == 
+#ifdef WINDOWS_OS
+                                SOCKET_ERROR
+#else
+                                -1
+#endif
+            ) {
+        printf("listen failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                WSAGetLastError()
+#else
+                                                errno
+#endif
+                );
+#ifdef WINDOWS_OS
+        closesocket (m_listen);
+#else
+        close (m_listen);
+#endif
         //WSACleanup();
         throw 4;
     }
@@ -74,7 +133,9 @@ MyServer::MyServer(const char* ip, u_short port)
 
 MyServer::~MyServer()
 {
+#ifdef WINDOWS_OS
     WSACleanup();
+#endif
 }
 
 void MyServer::start()
@@ -105,13 +166,35 @@ void MyServer::myAccept()
         
         ac_sock = accept(m_listen, NULL, NULL);
 
-        if (ac_sock == INVALID_SOCKET) {
-            printf("accept failed with error: %ld\n", WSAGetLastError());
-            closesocket(m_listen);
+        if (ac_sock == 
+#ifdef WINDOWS_OS
+                        INVALID_SOCKET
+#else
+                        -1
+#endif
+                ) {
+            printf("accept failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                    );
+#ifdef WINDOWS_OS
+            closesocket (m_listen);
+#else
+            close (m_listen);
+#endif
             //m_started = false;
             //WSACleanup();
             break;
-        } if (ac_sock == WSAEWOULDBLOCK) {
+        } if (ac_sock ==
+#ifdef WINDOWS_OS
+                        WSAEWOULDBLOCK
+#else
+                        EWOULDBLOCK
+#endif
+                ) {
             continue;
         } else {
             printClientInfo(ac_sock);
@@ -132,15 +215,51 @@ void MyServer::myAccept()
 void MyServer::printClientInfo(crossSocket ac_sock) {
     sockaddr_in ac_service;
     int len = sizeof(ac_service);
-    if (getsockname(ac_sock, (SOCKADDR* ) &ac_service, &len)
-            == SOCKET_ERROR) {
-        printf("getsocketname failed with error: %ld\n", WSAGetLastError());
+    if (getsockname(ac_sock, (
+#ifdef WINDOWS_OS
+                                SOCKADDR
+#else
+                                struct sockaddr
+#endif
+                                * ) &ac_service, &len)
+            == 
+#ifdef WINDOWS_OS
+                        SOCKET_ERROR
+#else
+                        -1
+#endif
+            ) {
+        printf("getsocketname failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                        WSAGetLastError()
+#else
+                                                        errno
+#endif
+                );
     }
     sockaddr_in cl_service;
     int cl_len = sizeof(cl_service);
-    if (getpeername(ac_sock, (SOCKADDR* ) &cl_service, &cl_len)
-            == SOCKET_ERROR) {
-        printf("getsocketname failed with error: %ld\n", WSAGetLastError());
+    if (getpeername(ac_sock, (
+#ifdef WINDOWS_OS
+                                SOCKADDR
+#else
+                                struct sockaddr
+#endif
+                             * ) &cl_service, &cl_len)
+            == 
+#ifdef WINDOWS_OS
+                        SOCKET_ERROR
+#else
+                        -1
+#endif
+            ) {
+        printf("getsocketname failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                        WSAGetLastError()
+#else
+                                                        errno
+#endif
+                );
     }
     //printf("Client connected:\n");
     //printf("  Client IP:PORT - %s:", inet_ntoa((in_addr) cl_service.sin_addr));
@@ -165,7 +284,11 @@ void MyServer::getCommands()
         }
         else if (s == "stop")
         {
-            closesocket(m_listen);
+#ifdef WINDOWS_OS
+            closesocket (m_listen);
+#else
+            close (m_listen);
+#endif
             m_clientsMutex.lock();
             for(auto it = m_clients.begin(); it != m_clients.end(); ++it)
             {
@@ -201,7 +324,13 @@ void MyServer::exchange(crossSocket sock)
             break;
         }
         else {
-            printf("recv failed: %d\n", WSAGetLastError());
+            printf("recv failed: %d\n", 
+#ifdef WINDOWS_OS
+                                        WSAGetLastError()
+#else
+                                        errno
+#endif
+                    );
             preDelClient(sock);
             m_needToDel.push(sock);
             break;
@@ -240,9 +369,25 @@ void MyServer::exchange(crossSocket sock)
         
         m_isClientsUpdateMutex.lock();
         iResult = send( sock, send_buf, send_buf_len, 0);
-        if (iResult == SOCKET_ERROR) {
-            printf("send failed with error: %d\n", WSAGetLastError());
-            closesocket(sock);
+        if (iResult == 
+#ifdef WINDOWS_OS
+                        SOCKET_ERROR
+#else
+                        -1
+#endif
+                ) {
+            printf("send failed with error: %d\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                    );
+#ifdef WINDOWS_OS
+            closesocket (sock);
+#else
+            close (sock);
+#endif
             //TODO off client
             throw 6;
         }
