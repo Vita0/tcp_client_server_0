@@ -2,14 +2,26 @@
 #include <cstring>
 #include <string>
 
-int readn(crossSocket fd, char *data, size_t data_len)
+int readnfrom(crossSocket fd, char *data, size_t data_len, int flags, struct sockaddr *from, int *fromlen)
 {
     int cnt;
     int res;
     
     cnt = data_len;
     while( cnt > 0 ) {
-        res = recv(fd, data, cnt, 0);
+        //res = recv(fd, data, cnt, 0);
+        struct timeval tv;    // устанавливаем время ожидания в 1 сек.
+        tv.tv_sec = 3;
+        tv.tv_usec = 0;
+        fd_set rfds;        // проверяем наличие данных в сокете, установив файловый дескриптор сокета в множестве "на чтение"
+        FD_ZERO(&rfds);    // очищаем множество "на чтение"
+        FD_SET(fd, &rfds);
+        int i = select(fd+1, &rfds, NULL, NULL,  &tv);    // контроллируем активность сокета
+        if ( i == 0 ) { 
+            printf("timeout\n");
+            return -1;
+        }
+        res = recvfrom(fd, data, cnt, 0, from, fromlen);
         if ( res < 0 )
         {
             if ( errno == EINTR )
@@ -32,12 +44,14 @@ int readn(crossSocket fd, char *data, size_t data_len)
 }
 
 MyClient::MyClient(const char *server_ip, u_short server_port)
-    :m_started(false)
+    :m_s(sizeof(m_clientService))
+    ,m_started(false)
     ,m_players_count(MAX_PLAYER_COUNT)
     ,m_number("")
     ,m_croupier("")
     ,m_rouletteValue(NO_VALUE_str)
 {
+    strcpy(m_ip,server_ip);
     m_players.resize(m_players_count);
     for(auto i=m_players.begin(); i!=m_players.end(); ++i)
     {
@@ -62,7 +76,7 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
     //----------------------
     // Create a crossSocket for listening for
     // incoming connection requests.
-    m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (m_socket == 
 #ifdef WINDOWS_OS
             INVALID_SOCKET
@@ -79,46 +93,45 @@ MyClient::MyClient(const char *server_ip, u_short server_port)
                 );
         //WSACleanup();
         throw 2;
-    }
-    struct sockaddr_in clientService; 
+    } 
     //----------------------
     // The sockaddr_in structure specifies the address family,
     // IP address, and port of the server to be connected to.
-    clientService.sin_family = AF_INET;
-    clientService.sin_addr.s_addr = inet_addr(server_ip);
-    clientService.sin_port = htons(server_port);
+    m_clientService.sin_family = AF_INET;
+    m_clientService.sin_addr.s_addr = inet_addr(m_ip);
+    m_clientService.sin_port = htons(server_port);
 
     //----------------------
     // Connect to server.
-    iResult = connect( m_socket, (
-#ifdef WINDOWS_OS
-                                    SOCKADDR
-#else
-                                    struct sockaddr
-#endif
-                                    *) &clientService, sizeof(clientService) );
-    if ( iResult == 
-#ifdef WINDOWS_OS
-                    SOCKET_ERROR
-#else
-                    -1
-#endif
-            ) {
-#ifdef WINDOWS_OS
-        closesocket (m_socket);
-#else
-        close (m_socket);
-#endif
-        printf("Unable to connect to server: %ld\n", 
-#ifdef WINDOWS_OS
-                                                    WSAGetLastError()
-#else
-                                                    errno
-#endif
-                );
-        //WSACleanup();
-        throw 3;
-    }
+//    iResult = connect( m_socket, (
+//#ifdef WINDOWS_OS
+//                                    SOCKADDR
+//#else
+//                                    struct sockaddr
+//#endif
+//                                    *) &m_clientService, sizeof(m_clientService) );
+//    if ( iResult == 
+//#ifdef WINDOWS_OS
+//                    SOCKET_ERROR
+//#else
+//                    -1
+//#endif
+//            ) {
+//#ifdef WINDOWS_OS
+//        closesocket (m_socket);
+//#else
+//        close (m_socket);
+//#endif
+//        printf("Unable to connect to server: %ld\n", 
+//#ifdef WINDOWS_OS
+//                                                    WSAGetLastError()
+//#else
+//                                                    errno
+//#endif
+//                );
+//        //WSACleanup();
+//        throw 3;
+//    }
 }
 
 MyClient::~MyClient()
@@ -170,24 +183,122 @@ void MyClient::start()
 
 void MyClient::getCommand()
 {
-    while (m_started)
+//    while (m_started)
+//    {
+//        updateScreen();
+//        string s = "";
+//        getline(cin, s);
+//        m_command = s;
+//        if (m_command == "stop") break;
+//    }
+}
+
+void MyClient::connect()
+{
+    Protocol p;
+    
+    const int send_buf_len = p.sendClientBufLen;
+    char send_buf[send_buf_len+1];
+    
+    const int recv_buf_len = p.sendServerBufLen;
+    char recv_buf[recv_buf_len+1];
+    
+    strcpy(send_buf,"connect");
+    int iResult = sendto( m_socket, send_buf, send_buf_len, 0, (struct sockaddr *) &m_clientService, m_s);
+        if (iResult == 
+#ifdef WINDOWS_OS
+            SOCKET_ERROR
+#else
+            -1
+#endif
+            ) {
+            printf("send failed with error: %d\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                   );
+#ifdef WINDOWS_OS
+            closesocket (m_socket);
+#else
+            close (m_socket);
+#endif
+            throw 6;
+        }
+        
+    iResult = readnfrom(m_socket, recv_buf, recv_buf_len, 0, (struct sockaddr *) &m_clientService, &m_s);
+    if ( iResult > 0 ) {
+        //printf("%s\n",recvbuf);
+        //printf("Bytes received: %d\n", iResult);
+    }
+    else if ( iResult == 0 ) {
+        printf("Connection closed\n");
+        m_started = false;
+        return;
+    }
+    else {
+        printf("connect failed: %d\n", 
+#ifdef WINDOWS_OS
+                                    WSAGetLastError()
+#else
+                                    errno
+#endif
+               );
+        m_started = false;
+        return;
+    }
+        
+    char buf[p.headerLen + 1];
+    sscanf(recv_buf, "%s", buf);
+    string recv_command = buf;
+    char *rb = recv_buf;
+    rb += strlen(buf);
+
+    if (recv_command == "port")
     {
-        updateScreen();
-        string s = "";
-        getline(cin, s);
-        m_command = s;
-        if (m_command == "stop") break;
+        int port;
+        sscanf( rb, "%d", &port );
+        m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (m_socket == 
+#ifdef WINDOWS_OS
+                INVALID_SOCKET
+#else
+                -1
+#endif
+                ) {
+            printf("socket failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                    WSAGetLastError()
+#else
+                    errno
+#endif
+                    );
+            //WSACleanup();
+            throw 2;
+        }
+        
+        m_clientService.sin_family = AF_INET;
+        m_clientService.sin_addr.s_addr = inet_addr(m_ip);
+        m_clientService.sin_port = htons(port);
     }
 }
 
 void MyClient::exchange()
 {
     Protocol p;
+    
+    const int send_buf_len = p.sendClientBufLen;
+    char send_buf[send_buf_len+1];
+    
+    const int recv_buf_len = p.sendServerBufLen;
+    char recv_buf[recv_buf_len+1];
+
+    connect();
+    
     while (m_started)
     {
-        const int send_buf_len = p.sendClientBufLen;
-        char send_buf[send_buf_len+1];
-        
+        getline(cin, m_command);
         if (m_command == "") {
             strcpy(send_buf, "ok");
             this_thread::sleep_for(chrono::milliseconds(1000/*25*/));
@@ -197,7 +308,7 @@ void MyClient::exchange()
             m_command = "";
         }
 
-        int iResult = send( m_socket, send_buf, send_buf_len, 0);
+        int iResult = sendto( m_socket, send_buf, send_buf_len, 0, (struct sockaddr *) &m_clientService, m_s);
         if (iResult == 
 #ifdef WINDOWS_OS
             SOCKET_ERROR
@@ -225,9 +336,7 @@ void MyClient::exchange()
             break;
         }
         
-        const int recv_buf_len = p.sendServerBufLen;
-        char recv_buf[recv_buf_len+1];
-        iResult = readn(m_socket, recv_buf, recv_buf_len);
+        iResult = readnfrom(m_socket, recv_buf, recv_buf_len, 0, (struct sockaddr *) &m_clientService, &m_s);
         if ( iResult > 0 ) {
             //printf("%s\n",recvbuf);
             //printf("Bytes received: %d\n", iResult);

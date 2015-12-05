@@ -3,14 +3,15 @@
 
 #include "MyServer.h"
 
-int readn(crossSocket fd, char *data, size_t data_len)
+int readnfrom(crossSocket fd, char *data, size_t data_len, int flags, struct sockaddr *from, int *fromlen)
 {
     int cnt;
     int res;
     
     cnt = data_len;
     while( cnt > 0 ) {
-        res = recv(fd, data, cnt, 0);
+        //res = recv(fd, data, cnt, 0);
+        res = recvfrom(fd, data, cnt, 0, from, fromlen);
         if ( res < 0 )
         {
             if ( errno == EINTR )
@@ -33,7 +34,9 @@ int readn(crossSocket fd, char *data, size_t data_len)
 }
 
 MyServer::MyServer(const char* ip, u_short port)
-    :m_started(false)
+    :m_ip(ip)
+    ,m_port(port)
+    ,m_started(false)
     ,m_delStarted(false)
 {
     int iResult;
@@ -47,7 +50,7 @@ MyServer::MyServer(const char* ip, u_short port)
     }
 #endif
     
-    m_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    m_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (m_listen == 
 #ifdef WINDOWS_OS
             INVALID_SOCKET
@@ -107,28 +110,28 @@ MyServer::MyServer(const char* ip, u_short port)
         throw 3;
     }
     
-    if (listen(m_listen, 1) == 
-#ifdef WINDOWS_OS
-                                SOCKET_ERROR
-#else
-                                -1
-#endif
-            ) {
-        printf("listen failed with error: %ld\n", 
-#ifdef WINDOWS_OS
-                                                WSAGetLastError()
-#else
-                                                errno
-#endif
-                );
-#ifdef WINDOWS_OS
-        closesocket (m_listen);
-#else
-        close (m_listen);
-#endif
-        //WSACleanup();
-        throw 4;
-    }
+//    if (listen(m_listen, 1) == 
+//#ifdef WINDOWS_OS
+//                                SOCKET_ERROR
+//#else
+//                                -1
+//#endif
+//            ) {
+//        printf("listen failed with error: %ld\n", 
+//#ifdef WINDOWS_OS
+//                                                WSAGetLastError()
+//#else
+//                                                errno
+//#endif
+//                );
+//#ifdef WINDOWS_OS
+//        closesocket (m_listen);
+//#else
+//        close (m_listen);
+//#endif
+//        //WSACleanup();
+//        throw 4;
+//    }
 }
 
 MyServer::~MyServer()
@@ -153,27 +156,114 @@ void MyServer::start()
 
 void MyServer::myAccept()
 {
+    int port = m_port;
+    Protocol p;
+    
+    int recv_buf_len = m_proto.sendClientBufLen;
+    char recv_buf[recv_buf_len+1] = "";
+    
+    int send_buf_len = m_proto.sendServerBufLen;
+    char send_buf[send_buf_len+1] = "";
+    
+    struct sockaddr_in si_other;
+    int slen = sizeof(si_other);
+    
     while (m_started)
     {
-        crossSocket ac_sock;
+        int iResult = readnfrom(m_listen, recv_buf, recv_buf_len, 0, (struct sockaddr *) &si_other, &slen);
+        if ( iResult > 0 ) {
+            //printf("%s\n",recvbuf);
+            //printf("Bytes received: %d\n", iResult);
+        }
+        else if ( iResult == 0 ) {
+            printf("Connection closed\n");
+            m_started = false;
+            break;
+        }
+        else {
+            printf("connect failed: %d\n", 
+#ifdef WINDOWS_OS
+                                        WSAGetLastError()
+#else
+                                        errno
+#endif
+                   );
+            m_started = false;
+            break;
+        }
         
-        //nonblocking
-        //u_int nb = 1;
-        //int res = ioctlsocket(ac_sock, FIONBIO, &nb);
-        //if (res != NO_ERROR)
-        //    printf("ioctlsocket failed with error: %ld\n", res);
-        //this_thread::sleep_for(chrono::microseconds(1000));
-        
-        ac_sock = accept(m_listen, NULL, NULL);
+        char buf[p.headerLen + 1];
+        sscanf(recv_buf, "%s", buf);
+        string recv_command = buf;
 
+        if (recv_command == "connect")
+        {
+            sprintf(send_buf, "port      %d", ++port);
+        }
+        
+        iResult = sendto( m_listen, send_buf, send_buf_len, 0, (struct sockaddr *) &si_other, slen);
+        if (iResult == 
+#ifdef WINDOWS_OS
+            SOCKET_ERROR
+#else
+            -1
+#endif
+            ) {
+            printf("send failed with error: %d\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                   );
+#ifdef WINDOWS_OS
+            closesocket (m_listen);
+#else
+            close (m_listen);
+#endif
+            throw 6;
+        }
+
+        crossSocket ac_sock;
+        ac_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (ac_sock == 
 #ifdef WINDOWS_OS
-                        INVALID_SOCKET
+            INVALID_SOCKET
 #else
-                        -1
+            -1
+#endif
+                        ) {
+            printf("socket failed with error: %ld\n", 
+#ifdef WINDOWS_OS
+                                                    WSAGetLastError()
+#else
+                                                    errno
+#endif
+                    );
+            //WSACleanup();
+            throw 2;
+        }
+    
+        sockaddr_in service;
+        service.sin_family = AF_INET;
+        service.sin_addr.s_addr = inet_addr(m_ip);
+        service.sin_port = htons(port);//0 - is any
+    
+        if (bind(ac_sock, (
+#ifdef WINDOWS_OS
+                            SOCKADDR
+#else
+                            struct sockaddr
+#endif
+                *) & service, sizeof (service))
+                == 
+#ifdef WINDOWS_OS
+                            SOCKET_ERROR
+#else
+                            -1
 #endif
                 ) {
-            printf("accept failed with error: %ld\n", 
+            printf("bind failed with error: %ld\n", 
 #ifdef WINDOWS_OS
                                                     WSAGetLastError()
 #else
@@ -181,35 +271,25 @@ void MyServer::myAccept()
 #endif
                     );
 #ifdef WINDOWS_OS
-            closesocket (m_listen);
+            closesocket (ac_sock);
 #else
-            close (m_listen);
+            close (ac_sock);
 #endif
-            //m_started = false;
             //WSACleanup();
-            break;
-        } if (ac_sock ==
-#ifdef WINDOWS_OS
-                        WSAEWOULDBLOCK
-#else
-                        EWOULDBLOCK
-#endif
-                ) {
-            continue;
-        } else {
-            printClientInfo(ac_sock);
-            m_isClientsStartedMutex.lock();
-            m_isClientsStarted.insert(make_pair(ac_sock, true));
-            m_isClientsStartedMutex.unlock();
-            m_isClientsUpdateMutex.lock();
-            m_isClientsUpdate.insert(make_pair(ac_sock, true));
-            m_isClientsUpdateMutex.unlock();
-            m_clientsMutex.lock();
-            m_clients.insert(make_pair(ac_sock, shared_ptr<thread> ( new thread(&MyServer::exchange, this, ac_sock) )));
-            m_clientsMutex.unlock();
+            throw 3;
         }
+        
+        printClientInfo(ac_sock);
+        m_isClientsStartedMutex.lock();
+        m_isClientsStarted.insert(make_pair(ac_sock, true));
+        m_isClientsStartedMutex.unlock();
+        m_isClientsUpdateMutex.lock();
+        m_isClientsUpdate.insert(make_pair(ac_sock, true));
+        m_isClientsUpdateMutex.unlock();
+        m_clientsMutex.lock();
+        m_clients.insert(make_pair(ac_sock, shared_ptr<thread> ( new thread(&MyServer::exchange, this, ac_sock) )));
+        m_clientsMutex.unlock();
     }
-    
 }
 
 void MyServer::printClientInfo(crossSocket ac_sock) {
@@ -237,30 +317,30 @@ void MyServer::printClientInfo(crossSocket ac_sock) {
 #endif
                 );
     }
-    sockaddr_in cl_service;
-    int cl_len = sizeof(cl_service);
-    if (getpeername(ac_sock, (
-#ifdef WINDOWS_OS
-                                SOCKADDR
-#else
-                                struct sockaddr
-#endif
-                             * ) &cl_service, &cl_len)
-            == 
-#ifdef WINDOWS_OS
-                        SOCKET_ERROR
-#else
-                        -1
-#endif
-            ) {
-        printf("getsocketname failed with error: %ld\n", 
-#ifdef WINDOWS_OS
-                                                        WSAGetLastError()
-#else
-                                                        errno
-#endif
-                );
-    }
+//    sockaddr_in cl_service;
+//    int cl_len = sizeof(cl_service);
+//    if (getpeername(ac_sock, (
+//#ifdef WINDOWS_OS
+//                                SOCKADDR
+//#else
+//                                struct sockaddr
+//#endif
+//                             * ) &cl_service, &cl_len)
+//            == 
+//#ifdef WINDOWS_OS
+//                        SOCKET_ERROR
+//#else
+//                        -1
+//#endif
+//            ) {
+//        printf("getsocketname failed with error: %ld\n", 
+//#ifdef WINDOWS_OS
+//                                                        WSAGetLastError()
+//#else
+//                                                        errno
+//#endif
+//                );
+//    }
     //printf("Client connected:\n");
     //printf("  Client IP:PORT - %s:", inet_ntoa((in_addr) cl_service.sin_addr));
     //printf("%d\n", cl_service.sin_port);
@@ -310,9 +390,12 @@ void MyServer::exchange(crossSocket sock)
     int send_buf_len = m_proto.sendServerBufLen;
     char send_buf[send_buf_len+1] = "";
     
+    struct sockaddr_in si_other;
+    int slen = sizeof(si_other);
+    
     while (m_started)
     {
-	int iResult = readn(sock, recv_buf, recv_buf_len);
+	int iResult = readnfrom(sock, recv_buf, recv_buf_len, 0, (struct sockaddr *) &si_other, &slen);
         if ( iResult > 0 ) {
             //printf("%s!\n",recv_buf);
             //printf("Bytes received: %d\n", iResult);
@@ -368,7 +451,7 @@ void MyServer::exchange(crossSocket sock)
         strcpy(send_buf, m_proto.convert(send_command, val, sock, croupier, pls, error).c_str());
         
         m_isClientsUpdateMutex.lock();
-        iResult = send( sock, send_buf, send_buf_len, 0);
+        iResult = sendto( sock, send_buf, send_buf_len, 0, (struct sockaddr *) &si_other, slen);
         if (iResult == 
 #ifdef WINDOWS_OS
                         SOCKET_ERROR

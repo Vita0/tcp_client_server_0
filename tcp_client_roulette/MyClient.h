@@ -24,7 +24,10 @@
 class MyClient
 {
 private:
+    char m_ip[20];
     crossSocket m_socket;
+    struct sockaddr_in m_clientService;
+    int m_s;
     bool m_started;
     const int m_players_count;
     
@@ -47,6 +50,7 @@ public:
     void exchange();
     void updateScreen();
     void addError(deque<string> &deq, const string &s);
+    void connect();
 };
 
 #endif	/* MYCLIENT_H */

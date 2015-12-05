@@ -27,4 +27,29 @@ while(m_started)
 	send_command = analize(const command, player_param) {isClStop?delClient,m_game->delPlayer/m_game.step(SOCKET)}
 	send_buf = m_proto.convert(send_command)
 	send(isError?error:isUpdate?info,m_update=false:ok)
-	
+//////////////////////
+
+
+udp
+
+		<-- info/error
+ok1		-->
+			end!
+			
+		<-- info/error
+*ok1	--x 
+		<-- info/error
+**ok1	--> 
+			end!
+**ok1	--x (1 sec) error, kill klient
+
+
+
+
+
+
+
+
+
+
+

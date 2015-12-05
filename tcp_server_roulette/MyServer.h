@@ -40,6 +40,9 @@ using namespace std;
 class MyServer
 {
 private:
+    const char* m_ip;
+    const u_short m_port;
+    
     mutex m_clientsMutex;
     mutex m_gameMutex;
     mutex m_isClientsStartedMutex;
