@@ -2,6 +2,28 @@
 #include <cstring>
 #include <string>
 
+void addNumber(int num, char* buf, int buf_len)
+{
+    string s = buf;
+    sprintf(buf, "%d %s", num, s.c_str());
+//    cout << buf << endl;
+}
+
+void getNumber(int &num, char* buf, int buf_len)
+{
+    char str[15];
+    sscanf(buf, "%s", str);
+//    cout << str << "!" << endl;
+    sscanf(str, "%d", &num);
+//    cout << num << endl;
+    char *without_num;
+    without_num = buf+strlen(str)+1;
+    string s = without_num;
+    strcpy(buf, without_num);
+//    cout << buf << "!" << endl;
+//    cout << num << endl;
+}
+
 int readnfrom(crossSocket fd, char *data, size_t data_len, int flags, struct sockaddr *from, int *fromlen)
 {
     int cnt;
@@ -183,14 +205,14 @@ void MyClient::start()
 
 void MyClient::getCommand()
 {
-//    while (m_started)
-//    {
-//        updateScreen();
-//        string s = "";
-//        getline(cin, s);
-//        m_command = s;
-//        if (m_command == "stop") break;
-//    }
+    while (m_started)
+    {
+        updateScreen();
+        string s = "";
+        getline(cin, s);
+        m_command = s;
+        if (m_command == "stop") break;
+    }
 }
 
 void MyClient::connect()
@@ -296,9 +318,12 @@ void MyClient::exchange()
 
     connect();
     
+    int num = 0;
+    int check;
+    
     while (m_started)
     {
-        getline(cin, m_command);
+        //getline(cin, m_command);
         if (m_command == "") {
             strcpy(send_buf, "ok");
             this_thread::sleep_for(chrono::milliseconds(1000/*25*/));
@@ -308,6 +333,8 @@ void MyClient::exchange()
             m_command = "";
         }
 
+        addNumber(++num, send_buf, send_buf_len);
+        
         int iResult = sendto( m_socket, send_buf, send_buf_len, 0, (struct sockaddr *) &m_clientService, m_s);
         if (iResult == 
 #ifdef WINDOWS_OS
@@ -330,6 +357,7 @@ void MyClient::exchange()
 #endif
             throw 6;
         }
+        getNumber(check, send_buf, send_buf_len);//Не для проверки, а для stop
         if (strcmp(send_buf,"stop") == 0)
         {
             m_started = false;
@@ -338,6 +366,12 @@ void MyClient::exchange()
         
         iResult = readnfrom(m_socket, recv_buf, recv_buf_len, 0, (struct sockaddr *) &m_clientService, &m_s);
         if ( iResult > 0 ) {
+            getNumber(check, recv_buf, recv_buf_len);
+            if (check != num)
+            {
+                cout << "waiting package with number " << num << ", but recive " << check << endl << "press any to exit..." << endl;
+                m_command = "stop";
+            }
             //printf("%s\n",recvbuf);
             //printf("Bytes received: %d\n", iResult);
         }

@@ -14,6 +14,9 @@
 
 using namespace std;
 
+void addNumber(int num, char* buf, int buf_len);
+void getNumber(int &num, char* buf, int buf_len);
+
 class Protocol
 {
 public:

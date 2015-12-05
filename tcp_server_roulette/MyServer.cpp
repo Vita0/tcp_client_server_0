@@ -3,6 +3,28 @@
 
 #include "MyServer.h"
 
+void addNumber(int num, char* buf, int buf_len)
+{
+    string s = buf;
+    sprintf(buf, "%d %s", num, s.c_str());
+//    cout << buf << endl;
+}
+
+void getNumber(int &num, char* buf, int buf_len)
+{
+    char str[15];
+    sscanf(buf, "%s", str);
+//    cout << str << "!" << endl;
+    sscanf(str, "%d", &num);
+//    cout << num << endl;
+    char *without_num;
+    without_num = buf+strlen(str)+1;
+    string s = without_num;
+    strcpy(buf, without_num);
+//    cout << buf << "!" << endl;
+//    cout << num << endl;
+}
+
 int readnfrom(crossSocket fd, char *data, size_t data_len, int flags, struct sockaddr *from, int *fromlen)
 {
     int cnt;
@@ -393,10 +415,13 @@ void MyServer::exchange(crossSocket sock)
     struct sockaddr_in si_other;
     int slen = sizeof(si_other);
     
+    int num;
+    
     while (m_started)
     {
 	int iResult = readnfrom(sock, recv_buf, recv_buf_len, 0, (struct sockaddr *) &si_other, &slen);
         if ( iResult > 0 ) {
+            getNumber(num, recv_buf, recv_buf_len);
             //printf("%s!\n",recv_buf);
             //printf("Bytes received: %d\n", iResult);
         }
@@ -451,6 +476,7 @@ void MyServer::exchange(crossSocket sock)
         strcpy(send_buf, m_proto.convert(send_command, val, sock, croupier, pls, error).c_str());
         
         m_isClientsUpdateMutex.lock();
+        addNumber(num, send_buf, send_buf_len);
         iResult = sendto( sock, send_buf, send_buf_len, 0, (struct sockaddr *) &si_other, slen);
         if (iResult == 
 #ifdef WINDOWS_OS
@@ -474,6 +500,7 @@ void MyServer::exchange(crossSocket sock)
             //TODO off client
             throw 6;
         }
+        getNumber(num, send_buf, send_buf_len);
         if (send_command == "info")
             m_isClientsUpdate.at(sock) = false;
         m_isClientsUpdateMutex.unlock();
