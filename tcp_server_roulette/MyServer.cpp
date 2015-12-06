@@ -2,6 +2,7 @@
 #include <chrono>
 
 #include "MyServer.h"
+#include <fcntl.h>
 
 void addNumber(int num, char* buf, int buf_len)
 {
@@ -33,9 +34,11 @@ int readnfrom(crossSocket fd, char *data, size_t data_len, int flags, struct soc
     cnt = data_len;
     while( cnt > 0 ) {
         //res = recv(fd, data, cnt, 0);
-        res = recvfrom(fd, data, cnt, 0, from, fromlen);
+        res = recvfrom(fd, data, cnt, 0, from, (socklen_t *) fromlen);
         if ( res < 0 )
         {
+            if (EAGAIN == errno)
+                return EAGAIN;
             if ( errno == EINTR )
                 continue;
             printf("recv failed: %d\n", 
@@ -45,7 +48,7 @@ int readnfrom(crossSocket fd, char *data, size_t data_len, int flags, struct soc
                     errno
 #endif
                     );
-            return -1;
+            return errno;
         }
         if ( res == 0 )
             return data_len - cnt;
@@ -96,6 +99,7 @@ MyServer::MyServer(const char* ip, u_short port)
     //int res = ioctlsocket(m_listen, FIONBIO, &nb);
     //if (res != NO_ERROR)
     //    printf("ioctlsocket failed with error: %ld\n", res);
+    fcntl(m_listen, F_SETFL, O_NONBLOCK);
     
     sockaddr_in service;
     service.sin_family = AF_INET;
@@ -192,8 +196,13 @@ void MyServer::myAccept()
     
     while (m_started)
     {
+        
         int iResult = readnfrom(m_listen, recv_buf, recv_buf_len, 0, (struct sockaddr *) &si_other, &slen);
         if ( iResult > 0 ) {
+            if (EAGAIN == iResult) {
+                this_thread::sleep_for(chrono::milliseconds(10));
+                continue;
+            }
             //printf("%s\n",recvbuf);
             //printf("Bytes received: %d\n", iResult);
         }
@@ -323,7 +332,7 @@ void MyServer::printClientInfo(crossSocket ac_sock) {
 #else
                                 struct sockaddr
 #endif
-                                * ) &ac_service, &len)
+                                * ) &ac_service, (socklen_t *) &len)
             == 
 #ifdef WINDOWS_OS
                         SOCKET_ERROR
