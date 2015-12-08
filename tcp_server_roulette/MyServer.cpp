@@ -424,12 +424,30 @@ void MyServer::exchange(crossSocket sock)
     struct sockaddr_in si_other;
     int slen = sizeof(si_other);
     
+    fcntl(sock, F_SETFL, O_NONBLOCK);
+    
     int num;
+    int time = 0;
     
     while (m_started)
     {
 	int iResult = readnfrom(sock, recv_buf, recv_buf_len, 0, (struct sockaddr *) &si_other, &slen);
         if ( iResult > 0 ) {
+            if (EAGAIN == iResult) {
+                this_thread::sleep_for(chrono::milliseconds(10));
+                time += 10;
+                //cout << time << endl;
+                if (time == 3000)
+                {
+                    preDelClient(sock);
+                    m_needToDel.push(sock);
+                    cout << "client " << sock << " timeout" << endl;
+                    break;
+                }
+                else
+                    continue;
+            }
+            time = 0;
             getNumber(num, recv_buf, recv_buf_len);
             //printf("%s!\n",recv_buf);
             //printf("Bytes received: %d\n", iResult);

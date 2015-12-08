@@ -334,7 +334,6 @@ void MyClient::exchange()
         }
 
         addNumber(++num, send_buf, send_buf_len);
-        
         int iResult = sendto( m_socket, send_buf, send_buf_len, 0, (struct sockaddr *) &m_clientService, m_s);
         if (iResult == 
 #ifdef WINDOWS_OS
